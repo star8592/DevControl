@@ -1,0 +1,56 @@
+{
+  "projects": [
+    {
+      "key": "daolife",
+      "name": "DaoLife",
+      "repo": "star8592/DaoLife",
+      "dashboardIssue": 4,
+      "phase": "V0.3 Relationship Phase 2",
+      "nextAction": "Friend/Rival causal relationship slice",
+      "lightWorkflows": ["DaoLife Light CI"],
+      "localWorkflows": ["DaoLife Local Lab"],
+      "safety": "No secret exposure; heavy experiments only on self-hosted runner.",
+      "localPath": "/mnt/disk1/Code/DaoLife",
+      "tags": ["game", "rust", "simulation"]
+    },
+    {
+      "key": "bisre",
+      "name": "BISRE",
+      "repo": "star8592/bisre",
+      "dashboardIssue": 26,
+      "phase": "Production Shadow",
+      "nextAction": "Continue read-only shadow; stop before Micro-Live",
+      "lightWorkflows": ["BISRE Local PR Gate", "Local PR Gate"],
+      "localWorkflows": ["BISRE Main Production Shadow", "Main Production Shadow"],
+      "safety": "Never alter frozen data or enable real-capital trading.",
+      "localPath": "/mnt/disk1/Code/bisre-full/bisre",
+      "tags": ["quant", "rust", "python"]
+    },
+    {
+      "key": "crossalpha",
+      "name": "CrossAlpha",
+      "repo": "star8592/CrossAlpha",
+      "dashboardIssue": 6,
+      "phase": "Rust migration gate",
+      "nextAction": "Resolve exact-head Rust gate; never auto-merge PR #1",
+      "lightWorkflows": [],
+      "localWorkflows": ["CrossAlpha Rust CI"],
+      "safety": "Never run Python and Rust production writers concurrently.",
+      "localPath": "/mnt/disk2/CrossAlpha",
+      "tags": ["quant", "rust", "migration"]
+    },
+    {
+      "key": "tidebound",
+      "name": "Tidebound",
+      "repo": "star8592/tidebound",
+      "dashboardIssue": 2,
+      "phase": "Steam Edition qualification",
+      "nextAction": "Keep PR #1 draft until real Steam acceptance gates pass",
+      "lightWorkflows": ["CI"],
+      "localWorkflows": ["Local Release Qualification"],
+      "safety": "Never publish to Steam or perform irreversible release actions.",
+      "localPath": "/mnt/disk1/Code/seaboartgame",
+      "tags": ["game", "steam", "release"]
+    }
+  ]
+}
