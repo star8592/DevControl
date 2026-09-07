@@ -35,6 +35,7 @@
       "nextAction": "Resolve exact-head Rust gate; never auto-merge PR #1",
       "lightWorkflows": [],
       "localWorkflows": ["CrossAlpha Rust CI"],
+      "localEvents": ["push", "workflow_dispatch"],
       "safety": "Never run Python and Rust production writers concurrently.",
       "localPath": "/mnt/disk2/CrossAlpha",
       "tags": ["quant", "rust", "migration"]
@@ -46,7 +47,7 @@
       "dashboardIssue": 2,
       "phase": "Steam Edition qualification",
       "nextAction": "Keep PR #1 draft until real Steam acceptance gates pass",
-      "lightWorkflows": ["CI"],
+      "lightWorkflows": ["CI", "Web CI"],
       "localWorkflows": ["Local Release Qualification"],
       "safety": "Never publish to Steam or perform irreversible release actions.",
       "localPath": "/mnt/disk1/Code/seaboartgame",
