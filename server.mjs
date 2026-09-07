@@ -36,8 +36,9 @@ const PROJECTS = {
     dashboardIssue: 6,
     phase: 'Rust migration gate',
     nextAction: 'Resolve exact-head Rust gate; never auto-merge PR #1',
-    lightWorkflows: ['Rust CI', 'CI'],
-    localWorkflows: ['Local', 'self-hosted'],
+    lightWorkflows: [],
+    localWorkflows: ['CrossAlpha Rust CI'],
+    localEvents: ['push', 'workflow_dispatch'],
     safety: 'Never run Python and Rust production writers concurrently.'
   },
   tidebound: {
@@ -46,7 +47,7 @@ const PROJECTS = {
     dashboardIssue: 2,
     phase: 'Steam Edition qualification',
     nextAction: 'Keep PR #1 draft until real Steam acceptance gates pass',
-    lightWorkflows: ['Web CI'],
+    lightWorkflows: ['CI', 'Web CI'],
     localWorkflows: ['Local Release Qualification'],
     safety: 'Never publish to Steam or perform irreversible release actions.'
   }
@@ -56,7 +57,7 @@ function githubHeaders() {
   const headers = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'DevControl/0.2'
+    'User-Agent': 'DevControl/0.2.1'
   };
   if (GITHUB_TOKEN) headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
   return headers;
@@ -85,8 +86,13 @@ function workflowMatch(run, names) {
   return names.some(candidate => name.includes(candidate.toLowerCase()));
 }
 
-function firstMatchingRun(runs, names) {
-  return runs.find(run => workflowMatch(run, names)) || null;
+function eventMatch(run, events) {
+  return !events?.length || events.includes(run?.event);
+}
+
+function firstMatchingRun(runs, names, events = null) {
+  if (!names?.length) return null;
+  return runs.find(run => workflowMatch(run, names) && eventMatch(run, events)) || null;
 }
 
 function normalizedConclusion(run) {
@@ -114,16 +120,25 @@ function runSummary(run) {
   };
 }
 
-function overallState(localRun, lightRun, latestRun) {
-  const runs = [localRun, lightRun, latestRun].filter(Boolean);
+function dashboardState(status) {
+  const value = String(status || '').trim().toUpperCase();
+  if (!value) return null;
+  if (['RUNNING', 'QUEUED', 'IN_PROGRESS', 'QUALIFYING', 'DEVELOPING'].includes(value)) return 'RUNNING';
+  if (['FAILED', 'FAIL', 'BLOCKED', 'ERROR'].includes(value)) return 'BLOCKED';
+  if (['PASS', 'PASSED', 'SUCCESS', 'HEALTHY', 'PROMOTED'].includes(value)) return 'PASS';
+  return null;
+}
+
+function overallState(localRun, lightRun, dashboardStatus) {
+  const runs = [localRun, lightRun].filter(Boolean);
   if (runs.some(run => run.status === 'in_progress' || run.status === 'queued')) return 'RUNNING';
-  if (runs.some(run => ['failure', 'timed_out', 'cancelled', 'action_required'].includes(run.conclusion))) return 'BLOCKED';
+  if (runs.some(run => ['failure', 'timed_out', 'cancelled'].includes(run.conclusion))) return 'BLOCKED';
   if (localRun?.conclusion === 'success' || lightRun?.conclusion === 'success') return 'PASS';
-  return 'IDLE';
+  return dashboardState(dashboardStatus?.status) || 'IDLE';
 }
 
 function inferBlocker(localRun, lightRun) {
-  const failed = [localRun, lightRun].find(run => run && ['failure', 'timed_out', 'cancelled', 'action_required'].includes(run.conclusion));
+  const failed = [localRun, lightRun].find(run => run && ['failure', 'timed_out', 'cancelled'].includes(run.conclusion));
   if (!failed) return null;
   return `${failed.name}: ${failed.conclusion}`;
 }
@@ -212,10 +227,10 @@ async function fetchProject(key, config) {
   ]);
 
   const runs = runsData?.workflow_runs || [];
-  const localRun = firstMatchingRun(runs, config.localWorkflows);
-  const lightRun = firstMatchingRun(runs, config.lightWorkflows);
+  const localRun = firstMatchingRun(runs, config.localWorkflows, config.localEvents);
+  const lightRun = firstMatchingRun(runs, config.lightWorkflows, config.lightEvents);
   const latestRun = runs[0] || null;
-  const state = overallState(localRun, lightRun, latestRun);
+  const state = overallState(localRun, lightRun, dashboardStatus);
   const runBlocker = inferBlocker(localRun, lightRun);
   const onlineRunners = runners.filter(runner => runner.status === 'online');
   const busyRunners = onlineRunners.filter(runner => runner.busy);
@@ -366,7 +381,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return sendJson(res, 200, { ok: true, service: 'DevControl', version: '0.2.0' });
+      return sendJson(res, 200, { ok: true, service: 'DevControl', version: '0.2.1' });
     }
     if (req.method === 'GET' && url.pathname === '/api/status') {
       return sendJson(res, 200, await portfolioStatus());
