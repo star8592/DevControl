@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadProjectRegistry } from './lib/project-registry.mjs';
 import { loadIntegrationRegistry } from './lib/integration-registry.mjs';
 import { createAuditLog } from './lib/audit-log.mjs';
+import { createLocalIntegrationBridge } from './lib/local-integration-bridge.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
@@ -15,6 +16,7 @@ const STATUS_REFRESH_MS = Math.max(5000, Number(process.env.STATUS_REFRESH_MS ||
 const registry = await loadProjectRegistry(__dirname);
 const integrations = await loadIntegrationRegistry(__dirname);
 const audit = createAuditLog();
+const bridge = createLocalIntegrationBridge({ integrationRegistry: integrations, projectRegistry: registry });
 const PROJECTS = registry.byKey;
 
 if (integrations.security.bindLocalhostOnly && !['127.0.0.1', 'localhost', '::1'].includes(HOST)) {
@@ -25,7 +27,7 @@ function githubHeaders() {
   const headers = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'DevControl/0.3.1'
+    'User-Agent': 'DevControl/0.3.2'
   };
   if (GITHUB_TOKEN) headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
   return headers;
@@ -265,7 +267,7 @@ async function portfolioStatus() {
 
   return {
     generatedAt: new Date().toISOString(),
-    version: '0.3.1',
+    version: '0.3.2',
     registry: { file: registry.filePath, projects: entries.length },
     integrationRegistry: { file: integrations.filePath, enabled: integrations.integrations.filter(item => item.enabled).length, total: integrations.integrations.length },
     stream: { enabled: true, refreshMs: STATUS_REFRESH_MS },
@@ -341,6 +343,26 @@ async function controlProject(body) {
   }
 }
 
+async function executeIntegration(body) {
+  const requestId = randomUUID();
+  const integration = String(body?.integration || '');
+  const action = String(body?.action || '');
+  const project = body?.project ? String(body.project) : null;
+  const baseAudit = { requestId, kind: 'integration', integration: integration || null, action: action || null, project };
+  try {
+    if (body && ('command' in body || 'shell' in body || 'argv' in body)) {
+      throw Object.assign(new Error('Arbitrary command text is forbidden by policy'), { status: 400 });
+    }
+    await audit.append({ ...baseAudit, outcome: 'requested' });
+    const result = await bridge.execute(body);
+    await audit.append({ ...baseAudit, outcome: result.ok === false ? 'tool-failed' : 'success' });
+    return { requestId, ...result };
+  } catch (error) {
+    await audit.append({ ...baseAudit, outcome: 'rejected-or-failed', error: String(error.message || error).slice(0, 300) }).catch(() => {});
+    throw error;
+  }
+}
+
 function contentType(filePath) {
   if (filePath.endsWith('.html')) return 'text/html; charset=utf-8';
   if (filePath.endsWith('.js')) return 'text/javascript; charset=utf-8';
@@ -386,7 +408,7 @@ function openEventStream(req, res) {
   });
   res.write('retry: 3000\n\n');
   eventClients.add(res);
-  sendEvent(res, 'hello', { service: 'DevControl', version: '0.3.1', refreshMs: STATUS_REFRESH_MS });
+  sendEvent(res, 'hello', { service: 'DevControl', version: '0.3.2', refreshMs: STATUS_REFRESH_MS });
   if (cachedPortfolio) sendEvent(res, 'status', cachedPortfolio);
   const heartbeat = setInterval(() => {
     try { res.write(`: heartbeat ${Date.now()}\n\n`); } catch { clearInterval(heartbeat); }
@@ -402,7 +424,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         ok: true,
         service: 'DevControl',
-        version: '0.3.1',
+        version: '0.3.2',
         projects: Object.keys(PROJECTS).length,
         integrations: integrations.integrations.length,
         sseClients: eventClients.size
@@ -420,6 +442,7 @@ const server = http.createServer(async (req, res) => {
         key: project.key, name: project.name, repo: project.repo, localPath: project.localPath || null, tags: project.tags || []
       })) });
     }
+    if (req.method === 'POST' && url.pathname === '/api/integration') return sendJson(res, 200, await executeIntegration(await readBody(req)));
     if (req.method === 'POST' && url.pathname === '/api/control') return sendJson(res, 200, await controlProject(await readBody(req)));
     return serveStatic(res, url.pathname);
   } catch (error) {
