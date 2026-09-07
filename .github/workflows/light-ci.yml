@@ -51,6 +51,18 @@ jobs:
           grep -q 'event: hello' /tmp/events.txt
           grep -q 'event: status' /tmp/events.txt
 
+          curl -fsS -X POST -H 'Content-Type: application/json' \
+            -d '{"integration":"git","action":"probe"}' \
+            http://127.0.0.1:8787/api/integration >/tmp/git-probe.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/git-probe.json','utf8'));if(d.integration!=='git'||d.ok!==true)process.exit(1);console.log(d.stdout.trim())"
+
+          code=$(curl -sS -o /tmp/codex-denied.json -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"integration":"codex","action":"plan","project":"daolife","prompt":"plan next step"}' \
+            http://127.0.0.1:8787/api/integration)
+          test "$code" = "403"
+          grep -q 'Integration disabled: codex' /tmp/codex-denied.json
+
           code=$(curl -sS -o /tmp/reject.json -w '%{http_code}' -X POST \
             -H 'Content-Type: application/json' \
             -d '{"project":"daolife","action":"run","command":"echo unsafe"}' \
@@ -58,5 +70,5 @@ jobs:
           test "$code" = "400"
           grep -q 'Arbitrary command text is forbidden' /tmp/reject.json
 
-          curl -fsS 'http://127.0.0.1:8787/api/audit?limit=10' >/tmp/audit.json
-          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));if(!Array.isArray(d.records)||!d.records.some(x=>x.outcome==='rejected-or-failed'))process.exit(1);if(d.records.some(x=>x.token||x.authorization||x.headers))process.exit(1);console.log(JSON.stringify({auditRecords:d.records.length}))"
+          curl -fsS 'http://127.0.0.1:8787/api/audit?limit=20' >/tmp/audit.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));if(!Array.isArray(d.records)||!d.records.some(x=>x.kind==='integration')||!d.records.some(x=>x.outcome==='rejected-or-failed'))process.exit(1);if(d.records.some(x=>x.token||x.authorization||x.headers||x.prompt))process.exit(1);console.log(JSON.stringify({auditRecords:d.records.length}))"
