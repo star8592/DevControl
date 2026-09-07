@@ -56,7 +56,7 @@ function githubHeaders() {
   const headers = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'DevControl/0.1'
+    'User-Agent': 'DevControl/0.2'
   };
   if (GITHUB_TOKEN) headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
   return headers;
@@ -128,6 +128,62 @@ function inferBlocker(localRun, lightRun) {
   return `${failed.name}: ${failed.conclusion}`;
 }
 
+function cleanDashboardValue(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (/^(none|no blocker|n\/a|na|-|无|无阻塞|当前无)$/i.test(text)) return null;
+  return text;
+}
+
+function parseDashboardComment(body) {
+  const fields = {};
+  const aliases = {
+    STATUS: 'status',
+    PHASE: 'phase',
+    BLOCKER: 'blocker',
+    NEXT: 'nextAction',
+    COST: 'cost',
+    UPDATED: 'updated',
+    'BRANCH/PR': 'branchPr',
+    'WEB CI': 'webCi',
+    'SELF-HOSTED QUALIFICATION': 'selfHostedQualification',
+    'KEY GATES': 'keyGates',
+    'KEY FINDING': 'keyFinding'
+  };
+
+  for (const line of String(body || '').split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:[-*]\s*)?([A-Z][A-Z0-9 /_-]{1,40}):\s*(.+?)\s*$/);
+    if (!match) continue;
+    const key = match[1].trim().replace(/\s+/g, ' ');
+    const target = aliases[key];
+    if (target) fields[target] = match[2].trim();
+  }
+
+  if (!fields.status && !fields.phase && !fields.blocker && !fields.nextAction && !fields.cost) return null;
+  return fields;
+}
+
+async function fetchDashboardStatus(repo, issueNumber) {
+  try {
+    const comments = await gh(`/repos/${repo}/issues/${issueNumber}/comments?per_page=100`);
+    for (let index = (comments || []).length - 1; index >= 0; index -= 1) {
+      const parsed = parseDashboardComment(comments[index].body);
+      if (!parsed) continue;
+      return {
+        ...parsed,
+        blocker: cleanDashboardValue(parsed.blocker),
+        commentUrl: comments[index].html_url,
+        commentCreatedAt: comments[index].created_at,
+        commentUpdatedAt: comments[index].updated_at
+      };
+    }
+    return null;
+  } catch (error) {
+    if ([403, 404].includes(error.status)) return null;
+    throw error;
+  }
+}
+
 async function fetchRunners(repo) {
   try {
     const data = await gh(`/repos/${repo}/actions/runners?per_page=100`);
@@ -146,12 +202,13 @@ async function fetchRunners(repo) {
 
 async function fetchProject(key, config) {
   const repoPath = `/repos/${config.repo}`;
-  const [repo, runsData, issue, pulls, runners] = await Promise.all([
+  const [repo, runsData, issue, pulls, runners, dashboardStatus] = await Promise.all([
     gh(repoPath),
     gh(`${repoPath}/actions/runs?per_page=40`),
     gh(`${repoPath}/issues/${config.dashboardIssue}`).catch(() => null),
     gh(`${repoPath}/pulls?state=open&per_page=20`).catch(() => []),
-    fetchRunners(config.repo)
+    fetchRunners(config.repo),
+    fetchDashboardStatus(config.repo, config.dashboardIssue)
   ]);
 
   const runs = runsData?.workflow_runs || [];
@@ -159,7 +216,7 @@ async function fetchProject(key, config) {
   const lightRun = firstMatchingRun(runs, config.lightWorkflows);
   const latestRun = runs[0] || null;
   const state = overallState(localRun, lightRun, latestRun);
-  const blocker = inferBlocker(localRun, lightRun);
+  const runBlocker = inferBlocker(localRun, lightRun);
   const onlineRunners = runners.filter(runner => runner.status === 'online');
   const busyRunners = onlineRunners.filter(runner => runner.busy);
 
@@ -169,11 +226,13 @@ async function fetchProject(key, config) {
     repo: config.repo,
     private: repo.private,
     defaultBranch: repo.default_branch,
-    phase: config.phase,
+    phase: dashboardStatus?.phase || config.phase,
     state,
-    blocker,
-    nextAction: config.nextAction,
+    blocker: runBlocker || dashboardStatus?.blocker || null,
+    nextAction: dashboardStatus?.nextAction || config.nextAction,
+    cost: dashboardStatus?.cost || null,
     safety: config.safety,
+    dashboardStatus,
     issue: issue ? {
       number: issue.number,
       title: issue.title,
@@ -307,7 +366,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return sendJson(res, 200, { ok: true, service: 'DevControl', version: '0.1.0' });
+      return sendJson(res, 200, { ok: true, service: 'DevControl', version: '0.2.0' });
     }
     if (req.method === 'GET' && url.pathname === '/api/status') {
       return sendJson(res, 200, await portfolioStatus());
