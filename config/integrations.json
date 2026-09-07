@@ -4,10 +4,10 @@
       "enabled": false,
       "mode": "supervised",
       "transport": "local-cli",
-      "capabilities": ["plan", "review", "edit", "test"],
+      "capabilities": ["plan", "review"],
       "allowProjectPathsOnly": true,
       "allowArbitraryShell": false,
-      "requireApprovalFor": ["push", "merge", "release", "production-write"]
+      "requireApprovalFor": ["edit", "test", "push", "merge", "release", "production-write"]
     },
     "openai": {
       "enabled": false,
