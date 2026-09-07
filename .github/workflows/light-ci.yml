@@ -19,17 +19,25 @@ jobs:
           node-version: '20'
       - name: Syntax check
         run: npm run check
-      - name: Health smoke
+      - name: Service smoke
         run: |
           node server.mjs > /tmp/devcontrol.log 2>&1 &
           pid=$!
           trap 'kill $pid 2>/dev/null || true' EXIT
+
+          ready=0
           for i in {1..20}; do
             if curl -fsS http://127.0.0.1:8787/api/health >/tmp/health.json; then
-              cat /tmp/health.json
-              exit 0
+              ready=1
+              break
             fi
             sleep 0.25
           done
-          cat /tmp/devcontrol.log
-          exit 1
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/devcontrol.log
+            exit 1
+          fi
+          cat /tmp/health.json
+
+          curl --max-time 45 -fsS http://127.0.0.1:8787/api/status >/tmp/status.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/status.json','utf8'));if(!Array.isArray(d.projects)||d.projects.length!==4)process.exit(1);console.log(JSON.stringify({projects:d.projects.length,counts:d.counts}))"
