@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devcontrol"
 SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 ENV_FILE="$CONFIG_DIR/env"
+INTEGRATIONS_FILE="$CONFIG_DIR/integrations.json"
 SERVICE_FILE="$SYSTEMD_DIR/devcontrol.service"
 OWNER="${DEVCONTROL_OWNER:-star8592}"
 HOST_VALUE="${HOST:-127.0.0.1}"
@@ -33,18 +34,28 @@ fi
 
 mkdir -p "$CONFIG_DIR" "$SYSTEMD_DIR"
 umask 077
+
+if [ ! -f "$INTEGRATIONS_FILE" ]; then
+  cp "$ROOT/config/integrations.json" "$INTEGRATIONS_FILE"
+  chmod 600 "$INTEGRATIONS_FILE"
+  echo "Created local integration config: $INTEGRATIONS_FILE"
+else
+  echo "Keeping existing local integration config: $INTEGRATIONS_FILE"
+fi
+
 cat > "$ENV_FILE" <<EOF
 GITHUB_TOKEN=$TOKEN
 DEVCONTROL_OWNER=$OWNER
 HOST=$HOST_VALUE
 PORT=$PORT_VALUE
+DEVCONTROL_INTEGRATIONS_FILE=$INTEGRATIONS_FILE
 EOF
 chmod 600 "$ENV_FILE"
 
 NODE_BIN="$(command -v node)"
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=DevControl portfolio development console
+Description=DevControl generic local-first project control console
 After=network-online.target
 Wants=network-online.target
 
@@ -64,11 +75,13 @@ EOF
 
 systemctl --user daemon-reload
 systemctl --user enable --now devcontrol.service
+systemctl --user restart devcontrol.service
 
 URL="http://$HOST_VALUE:$PORT_VALUE/api/health"
-for _ in $(seq 1 20); do
+for _ in $(seq 1 30); do
   if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; then
     echo "DevControl is running: http://$HOST_VALUE:$PORT_VALUE"
+    echo "Integrations: $INTEGRATIONS_FILE"
     echo "Service: systemctl --user status devcontrol.service"
     exit 0
   fi
