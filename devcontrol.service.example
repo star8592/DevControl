@@ -1,0 +1,19 @@
+[Unit]
+Description=DevControl portfolio development console
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/PATH/TO/DevControl
+EnvironmentFile=%h/.config/devcontrol/env
+ExecStart=/usr/bin/env node server.mjs
+Restart=on-failure
+RestartSec=3
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
