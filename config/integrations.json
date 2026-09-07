@@ -7,22 +7,31 @@
       "capabilities": ["plan", "review"],
       "allowProjectPathsOnly": true,
       "allowArbitraryShell": false,
+      "contextPolicy": "repository-read-only",
       "requireApprovalFor": ["edit", "test", "push", "merge", "release", "production-write"]
     },
     "openai": {
       "enabled": false,
       "mode": "supervised",
       "transport": "api",
-      "capabilities": ["chat", "summarize", "triage", "plan"],
+      "protocol": "responses",
+      "model": "",
+      "capabilities": ["chat", "summarize", "triage", "plan", "review"],
+      "contextPolicy": "bounded-project-metadata",
       "sendSecrets": false,
-      "sendUnredactedLogs": false
+      "sendUnredactedLogs": false,
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "maxOutputTokens": 2400
     },
     "localModel": {
       "enabled": false,
       "mode": "supervised",
       "transport": "openai-compatible-http",
       "endpoint": "http://127.0.0.1:11434/v1",
-      "capabilities": ["chat", "summarize", "triage"]
+      "protocol": "chat-completions",
+      "model": "",
+      "capabilities": ["chat", "summarize", "triage", "plan", "review"],
+      "contextPolicy": "bounded-project-metadata"
     },
     "git": {
       "enabled": true,
