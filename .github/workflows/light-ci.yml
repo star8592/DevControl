@@ -17,16 +17,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Syntax check
+      - name: Syntax and registry checks
         run: npm run check
-      - name: Service smoke
+      - name: Service and safety smoke
         run: |
+          set -euo pipefail
+          export DEVCONTROL_AUDIT_FILE=/tmp/devcontrol-audit.ndjson
           node server.mjs > /tmp/devcontrol.log 2>&1 &
           pid=$!
           trap 'kill $pid 2>/dev/null || true' EXIT
 
           ready=0
-          for i in {1..20}; do
+          for i in {1..30}; do
             if curl -fsS http://127.0.0.1:8787/api/health >/tmp/health.json; then
               ready=1
               break
@@ -40,4 +42,21 @@ jobs:
           cat /tmp/health.json
 
           curl --max-time 45 -fsS http://127.0.0.1:8787/api/status >/tmp/status.json
-          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/status.json','utf8'));if(!Array.isArray(d.projects)||d.projects.length!==4)process.exit(1);console.log(JSON.stringify({projects:d.projects.length,counts:d.counts}))"
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/status.json','utf8'));if(!Array.isArray(d.projects)||d.projects.length!==4)process.exit(1);if(!d.stream?.enabled)process.exit(1);console.log(JSON.stringify({projects:d.projects.length,counts:d.counts,stream:d.stream}))"
+
+          curl -fsS http://127.0.0.1:8787/api/integrations >/tmp/integrations.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/integrations.json','utf8'));if(!Array.isArray(d.integrations)||d.integrations.length<2)process.exit(1);if(d.security?.defaultWritePolicy!=='deny')process.exit(1);if(d.integrations.some(x=>x.token||x.authorization))process.exit(1);console.log(JSON.stringify({integrations:d.integrations.length,security:d.security}))"
+
+          timeout 3s curl -NsS http://127.0.0.1:8787/api/events >/tmp/events.txt || true
+          grep -q 'event: hello' /tmp/events.txt
+          grep -q 'event: status' /tmp/events.txt
+
+          code=$(curl -sS -o /tmp/reject.json -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"project":"daolife","action":"run","command":"echo unsafe"}' \
+            http://127.0.0.1:8787/api/control)
+          test "$code" = "400"
+          grep -q 'Arbitrary command text is forbidden' /tmp/reject.json
+
+          curl -fsS 'http://127.0.0.1:8787/api/audit?limit=10' >/tmp/audit.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));if(!Array.isArray(d.records)||!d.records.some(x=>x.outcome==='rejected-or-failed'))process.exit(1);if(d.records.some(x=>x.token||x.authorization||x.headers))process.exit(1);console.log(JSON.stringify({auditRecords:d.records.length}))"
