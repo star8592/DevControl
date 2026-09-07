@@ -1,12 +1,12 @@
 {
   "name": "devcontrol",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
-    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
+    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
   },
   "engines": {
     "node": ">=20"
