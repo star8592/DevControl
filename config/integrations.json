@@ -1,0 +1,62 @@
+{
+  "integrations": {
+    "codex": {
+      "enabled": false,
+      "mode": "supervised",
+      "transport": "local-cli",
+      "capabilities": ["plan", "review", "edit", "test"],
+      "allowProjectPathsOnly": true,
+      "allowArbitraryShell": false,
+      "requireApprovalFor": ["push", "merge", "release", "production-write"]
+    },
+    "openai": {
+      "enabled": false,
+      "mode": "supervised",
+      "transport": "api",
+      "capabilities": ["chat", "summarize", "triage", "plan"],
+      "sendSecrets": false,
+      "sendUnredactedLogs": false
+    },
+    "localModel": {
+      "enabled": false,
+      "mode": "supervised",
+      "transport": "openai-compatible-http",
+      "endpoint": "http://127.0.0.1:11434/v1",
+      "capabilities": ["chat", "summarize", "triage"]
+    },
+    "git": {
+      "enabled": true,
+      "mode": "read-only",
+      "transport": "local-cli",
+      "capabilities": ["status", "diff", "log"],
+      "writeCommands": false
+    },
+    "githubCli": {
+      "enabled": true,
+      "mode": "read-only",
+      "transport": "local-cli",
+      "capabilities": ["auth-status", "repo-view", "pr-view", "run-view"]
+    },
+    "editor": {
+      "enabled": false,
+      "mode": "supervised",
+      "transport": "local-launcher",
+      "command": "code",
+      "capabilities": ["open-project"]
+    },
+    "githubDesktop": {
+      "enabled": false,
+      "mode": "disabled",
+      "transport": "local-launcher",
+      "capabilities": ["open-project"],
+      "note": "Optional on supported desktop operating systems; not a Linux dependency."
+    }
+  },
+  "security": {
+    "bindLocalhostOnly": true,
+    "browserNeverReceivesTokens": true,
+    "rejectArbitraryCommandText": true,
+    "auditEveryWriteAction": true,
+    "defaultWritePolicy": "deny"
+  }
+}
