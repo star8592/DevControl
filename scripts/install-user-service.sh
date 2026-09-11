@@ -9,12 +9,17 @@ INTEGRATIONS_FILE="$CONFIG_DIR/integrations.json"
 SERVICE_FILE="$SYSTEMD_DIR/devcontrol.service"
 DISCOVERY_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-discovery.service"
 DISCOVERY_TIMER_FILE="$SYSTEMD_DIR/devcontrol-discovery.timer"
+QUALIFY_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-qualify.service"
+QUALIFY_TIMER_FILE="$SYSTEMD_DIR/devcontrol-qualify.timer"
+LOCAL_BIN="${HOME}/.local/bin"
 OWNER="${DEVCONTROL_OWNER:-star8592}"
 HOST_VALUE="${HOST:-127.0.0.1}"
 PORT_VALUE="${PORT:-8787}"
 DISCOVERY_ROOTS="${DEVCONTROL_DISCOVERY_ROOTS:-/mnt/disk1/Code:/mnt/disk2}"
 DISCOVERY_MAX_DEPTH="${DEVCONTROL_DISCOVERY_MAX_DEPTH:-3}"
 DISCOVERY_INTERVAL="${DEVCONTROL_DISCOVERY_INTERVAL_SEC:-60}"
+QUALIFY_INTERVAL="${DEVCONTROL_QUALIFY_INTERVAL_SEC:-120}"
+QUALIFY_TIMEOUT="${DEVCONTROL_QUALIFY_TIMEOUT_MS:-900000}"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: Node.js 20+ is required." >&2
@@ -37,7 +42,7 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-mkdir -p "$CONFIG_DIR" "$SYSTEMD_DIR" "$ROOT/state"
+mkdir -p "$CONFIG_DIR" "$SYSTEMD_DIR" "$ROOT/state" "$LOCAL_BIN"
 umask 077
 
 if [ ! -f "$INTEGRATIONS_FILE" ]; then
@@ -57,13 +62,21 @@ DEVCONTROL_INTEGRATIONS_FILE=$INTEGRATIONS_FILE
 DEVCONTROL_DISCOVERY_ROOTS=$DISCOVERY_ROOTS
 DEVCONTROL_DISCOVERY_MAX_DEPTH=$DISCOVERY_MAX_DEPTH
 DEVCONTROL_DISCOVERY_FILE=$ROOT/state/discovery.json
+DEVCONTROL_STATE_DIR=$ROOT/state
+DEVCONTROL_QUALIFY_TIMEOUT_MS=$QUALIFY_TIMEOUT
 EOF
 chmod 600 "$ENV_FILE"
 
 NODE_BIN="$(command -v node)"
+cat > "$LOCAL_BIN/devctl" <<EOF
+#!/usr/bin/env bash
+exec "$NODE_BIN" "$ROOT/scripts/devctl.mjs" "\$@"
+EOF
+chmod 755 "$LOCAL_BIN/devctl"
+
 cat > "$SERVICE_FILE" <<EOF
 [Unit]
-Description=DevControl generic local-first project control console
+Description=DevControl local-first multi-project control plane
 After=network-online.target
 Wants=network-online.target
 
@@ -110,9 +123,41 @@ Unit=devcontrol-discovery.service
 WantedBy=timers.target
 EOF
 
+cat > "$QUALIFY_SERVICE_FILE" <<EOF
+[Unit]
+Description=DevControl safe automatic project qualification
+After=devcontrol-discovery.service
+ConditionPathExists=$ROOT/state/discovery.json
+
+[Service]
+Type=oneshot
+WorkingDirectory=$ROOT
+EnvironmentFile=$ENV_FILE
+ExecStart=$NODE_BIN $ROOT/scripts/qualify-projects.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+Nice=5
+EOF
+
+cat > "$QUALIFY_TIMER_FILE" <<EOF
+[Unit]
+Description=Periodically qualify eligible DevControl projects
+
+[Timer]
+OnBootSec=25s
+OnUnitActiveSec=${QUALIFY_INTERVAL}s
+AccuracySec=10s
+Persistent=true
+Unit=devcontrol-qualify.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
 systemctl --user daemon-reload
 systemctl --user enable --now devcontrol.service
 systemctl --user enable --now devcontrol-discovery.timer
+systemctl --user enable --now devcontrol-qualify.timer
 systemctl --user start devcontrol-discovery.service
 systemctl --user restart devcontrol.service
 
@@ -120,10 +165,12 @@ URL="http://$HOST_VALUE:$PORT_VALUE/api/health"
 for _ in $(seq 1 30); do
   if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; then
     echo "DevControl is running: http://$HOST_VALUE:$PORT_VALUE"
-    echo "Integrations: $INTEGRATIONS_FILE"
-    echo "Discovery: $ROOT/state/discovery.json every ${DISCOVERY_INTERVAL}s"
-    echo "Service: systemctl --user status devcontrol.service"
-    echo "Timer:   systemctl --user status devcontrol-discovery.timer"
+    echo "CLI:       $LOCAL_BIN/devctl"
+    echo "Discovery: every ${DISCOVERY_INTERVAL}s"
+    echo "Qualify:   every ${QUALIFY_INTERVAL}s"
+    echo "State:     $ROOT/state"
+    echo "Service:   systemctl --user status devcontrol.service"
+    echo "Timers:    systemctl --user list-timers 'devcontrol-*'"
     exit 0
   fi
   sleep 0.25
