@@ -1,14 +1,19 @@
 {
   "name": "devcontrol",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "devctl": "scripts/devctl.mjs"
+  },
   "scripts": {
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
     "discover": "node scripts/discover-projects.mjs",
+    "qualify:auto": "node scripts/qualify-projects.mjs",
+    "qualify:managed": "node scripts/qualify-projects.mjs --managed",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/project-discovery.mjs && node --check lib/autonomy-policy.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check scripts/discover-projects.mjs && node --check public/integration-console.js && node --test && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
+    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/project-discovery.mjs && node --check lib/autonomy-policy.mjs && node --check lib/project-executor.mjs && node --check lib/project-learner.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check scripts/discover-projects.mjs && node --check scripts/qualify-projects.mjs && node --check scripts/devctl.mjs && node --check public/integration-console.js && node --test && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
   },
   "engines": {
     "node": ">=20"
