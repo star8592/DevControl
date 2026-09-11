@@ -3,7 +3,12 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { validateVisualContract, assertRoundMatchesContract, contractFingerprint } from '../lib/visual-loop/contract.mjs';
+import {
+  validateVisualContract,
+  assertRoundMatchesContract,
+  contractFingerprint,
+  verifyVisualContractTargetFiles,
+} from '../lib/visual-loop/contract.mjs';
 import { evaluateVisualLoopRound } from '../lib/visual-loop/round.mjs';
 import { loadVisualLoopHistory, historyForStall, recordVisualLoopRound } from '../lib/visual-loop/store.mjs';
 
@@ -12,11 +17,11 @@ async function json(filePath) {
 }
 
 function usage() {
-  console.error('Usage: node scripts/visual-loop-evaluate.mjs PROJECT_KEY CONTRACT.json MANIFEST.json VERDICT.json [STORE_ROOT]');
+  console.error('Usage: node scripts/visual-loop-evaluate.mjs PROJECT_KEY CONTRACT.json MANIFEST.json VERDICT.json [STORE_ROOT] [TARGET_ROOT]');
 }
 
 async function main() {
-  const [, , projectKey, contractPath, manifestPath, verdictPath, rootArg] = process.argv;
+  const [, , projectKey, contractPath, manifestPath, verdictPath, rootArg, targetRootArg] = process.argv;
   if (!projectKey || !contractPath || !manifestPath || !verdictPath) {
     usage();
     process.exitCode = 2;
@@ -24,12 +29,15 @@ async function main() {
   }
 
   const rootDir = path.resolve(rootArg || path.dirname(fileURLToPath(import.meta.url)), '..');
+  const absoluteContractPath = path.resolve(contractPath);
+  const targetRoot = path.resolve(targetRootArg || path.dirname(absoluteContractPath));
   const [rawContract, manifest, verdict] = await Promise.all([
-    json(contractPath),
+    json(absoluteContractPath),
     json(manifestPath),
     json(verdictPath),
   ]);
   const contract = validateVisualContract(rawContract);
+  const targetVerification = await verifyVisualContractTargetFiles(rawContract, targetRoot);
   assertRoundMatchesContract(manifest, contract);
 
   const persisted = await loadVisualLoopHistory(rootDir, projectKey);
@@ -66,6 +74,8 @@ async function main() {
     project: projectKey,
     contractId: contract.contractId,
     contractFingerprint: contractFingerprint(rawContract),
+    targetFilesVerified: true,
+    verifiedTargetRoles: Object.keys(targetVerification.verifiedTargets),
     roundId: round.roundId,
     commitSha: round.commitSha,
     score: round.score,

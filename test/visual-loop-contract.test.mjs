@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   validateVisualContract,
   contractFingerprint,
   assertRoundMatchesContract,
+  verifyVisualContractTargetFiles,
 } from '../lib/visual-loop/contract.mjs';
 
 const digest = 'a'.repeat(64);
@@ -21,17 +26,21 @@ function contract() {
     requiredRoles: ['gameplay_hero', 'character_close'],
     targets: {
       gameplay_hero: {
-        path: '.devcontrol/visual-loop/targets/gameplay_hero.png',
+        path: 'targets/gameplay_hero.png',
         sha256: digest,
         source: 'generated-from-current',
       },
       character_close: {
-        path: '.devcontrol/visual-loop/targets/character_close.png',
+        path: 'targets/character_close.png',
         sha256: 'b'.repeat(64),
         source: 'human-approved',
       },
     },
   };
+}
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
 }
 
 test('frozen target contract requires one hashed image per required role', () => {
@@ -63,6 +72,46 @@ test('contract fingerprint is stable and changes when target bytes change', () =
   const changed = contract();
   changed.targets.gameplay_hero.sha256 = 'c'.repeat(64);
   assert.notEqual(contractFingerprint(changed), first);
+});
+
+test('target verifier hashes real files and rejects tampering', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'visual-loop-contract-'));
+  try {
+    await mkdir(path.join(root, 'targets'), { recursive: true });
+    const hero = Buffer.from('hero-target-v1');
+    const character = Buffer.from('character-target-v1');
+    await writeFile(path.join(root, 'targets/gameplay_hero.png'), hero);
+    await writeFile(path.join(root, 'targets/character_close.png'), character);
+
+    const frozen = contract();
+    frozen.targets.gameplay_hero.sha256 = sha256(hero);
+    frozen.targets.character_close.sha256 = sha256(character);
+
+    const verified = await verifyVisualContractTargetFiles(frozen, root);
+    assert.deepEqual(Object.keys(verified.verifiedTargets), ['gameplay_hero', 'character_close']);
+    assert.equal(verified.verifiedTargets.character_close.bytes, character.byteLength);
+
+    await writeFile(path.join(root, 'targets/character_close.png'), Buffer.from('tampered'));
+    await assert.rejects(
+      verifyVisualContractTargetFiles(frozen, root),
+      /target SHA-256 mismatch for character_close/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('target verifier rejects missing files', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'visual-loop-contract-missing-'));
+  try {
+    const frozen = contract();
+    await assert.rejects(
+      verifyVisualContractTargetFiles(frozen, root),
+      /target file unavailable for gameplay_hero/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('round must point to exact frozen contract and contain its required roles', () => {
