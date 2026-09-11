@@ -29,6 +29,7 @@ if (command === 'failures') run('scripts/report-failures.mjs', args);
 if (command === 'repairs') run('scripts/plan-repairs.mjs', args);
 if (command === 'auto-fix') run('scripts/auto-fix.mjs', args);
 if (command === 'repair-publish') run('scripts/publish-repairs.mjs', args);
+if (command === 'repair-review') run('scripts/review-repairs.mjs', args);
 if (command === 'check') {
   const result = spawnSync('npm', ['run', 'check'], {
     cwd: baseDir,
@@ -68,6 +69,6 @@ if (command === 'status') {
 
 console.error(`Unknown command: ${command}`);
 console.error(
-  'Commands: discover, sync, qualify, reconcile, failures, repairs, auto-fix, repair-publish, local, quarantine-clear, status, check'
+  'Commands: discover, sync, qualify, reconcile, failures, repairs, auto-fix, repair-publish, repair-review, local, quarantine-clear, status, check'
 );
 process.exit(2);
