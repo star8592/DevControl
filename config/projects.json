@@ -5,13 +5,55 @@
       "name": "DaoLife",
       "repo": "star8592/DaoLife",
       "dashboardIssue": 4,
-      "phase": "V0.3 Relationship Phase 2",
-      "nextAction": "Friend/Rival causal relationship slice",
+      "phase": "First playable visual qualification",
+      "nextAction": "Probe nested Godot root, then enable 1920x1080 Forward+ visual gate",
       "lightWorkflows": ["DaoLife Light CI"],
       "localWorkflows": ["DaoLife Local Lab"],
       "safety": "No secret exposure; heavy experiments only on self-hosted runner.",
       "localPath": "/mnt/disk1/Code/DaoLife",
-      "tags": ["game", "rust", "simulation"]
+      "tags": ["game", "rust", "simulation", "godot"],
+      "visualQualification": {
+        "enabled": false,
+        "adapter": "godot-vulkan-frame-capture",
+        "renderer": "forward_plus",
+        "gpuIndex": 0,
+        "frames": 90,
+        "fps": 30,
+        "minFrames": 1,
+        "minWidth": 1920,
+        "minHeight": 1080,
+        "minBytes": 4096,
+        "headless": true,
+        "requireVulkan": true,
+        "gpuPattern": "NVIDIA"
+      }
+    },
+    {
+      "key": "dandao",
+      "name": "DanDao",
+      "repo": "star8592/DanDao",
+      "phase": "V0.0.2 ancient fire control visual pass",
+      "nextAction": "Probe Godot root and qualify the real cauldron scene before enabling autonomous visual repair",
+      "lightWorkflows": [],
+      "localWorkflows": [],
+      "safety": "Never publish or release automatically; visual qualification may run only after explicit opt-in.",
+      "localPath": "/mnt/disk1/Code/DanDao",
+      "tags": ["game", "godot", "alchemy", "2.5d"],
+      "visualQualification": {
+        "enabled": false,
+        "adapter": "godot-vulkan-frame-capture",
+        "renderer": "forward_plus",
+        "gpuIndex": 0,
+        "frames": 90,
+        "fps": 30,
+        "minFrames": 1,
+        "minWidth": 1920,
+        "minHeight": 1080,
+        "minBytes": 4096,
+        "headless": true,
+        "requireVulkan": true,
+        "gpuPattern": "NVIDIA"
+      }
     },
     {
       "key": "bisre",
@@ -46,12 +88,27 @@
       "repo": "star8592/tidebound",
       "dashboardIssue": 2,
       "phase": "Steam Edition qualification",
-      "nextAction": "Keep PR #1 draft until real Steam acceptance gates pass",
+      "nextAction": "Probe real renderer and keep release actions outside DevControl",
       "lightWorkflows": ["CI", "Web CI"],
       "localWorkflows": ["Local Release Qualification"],
       "safety": "Never publish to Steam or perform irreversible release actions.",
       "localPath": "/mnt/disk1/Code/seaboartgame",
-      "tags": ["game", "steam", "release"]
+      "tags": ["game", "steam", "release", "godot"],
+      "visualQualification": {
+        "enabled": false,
+        "adapter": "godot-vulkan-frame-capture",
+        "renderer": "forward_plus",
+        "gpuIndex": 0,
+        "frames": 90,
+        "fps": 30,
+        "minFrames": 1,
+        "minWidth": 1920,
+        "minHeight": 1080,
+        "minBytes": 4096,
+        "headless": true,
+        "requireVulkan": true,
+        "gpuPattern": "NVIDIA"
+      }
     }
   ]
 }
