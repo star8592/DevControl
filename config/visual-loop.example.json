@@ -26,13 +26,7 @@
       "engineVersion": "4.7.2",
       "renderer": "Vulkan Forward+",
       "resolution": [1920, 1080],
-      "captureRoles": [
-        "gameplay_hero",
-        "character_close",
-        "architecture_close",
-        "alternate_45",
-        "rear_or_side"
-      ],
+      "captureRolesSource": "project-frozen-contract",
       "performance": {
         "minAverageFps": 60,
         "minOnePercentLowFps": 45,
@@ -55,6 +49,13 @@
       "repo": "star8592/DaoLife",
       "localPath": "/mnt/disk1/Code/DaoLife",
       "contractPath": ".devcontrol/visual-loop/contract.json",
+      "captureRoles": [
+        "gameplay_hero",
+        "character_close",
+        "architecture_close",
+        "alternate_45",
+        "rear_or_side"
+      ],
       "priorityCaptureRoles": [
         "gameplay_hero",
         "character_close"
@@ -64,7 +65,19 @@
       "profile": "godot-production",
       "repo": "star8592/DanDao",
       "localPath": "/mnt/disk1/Code/DanDao",
-      "contractPath": ".devcontrol/visual-loop/contract.json"
+      "contractPath": ".devcontrol/visual-loop/contract.json",
+      "captureRoles": [
+        "gameplay_hero",
+        "furnace_close",
+        "fire_control_close",
+        "alternate_left",
+        "result_right"
+      ],
+      "priorityCaptureRoles": [
+        "gameplay_hero",
+        "furnace_close",
+        "fire_control_close"
+      ]
     },
     "tidebound": {
       "profile": "godot-production",
