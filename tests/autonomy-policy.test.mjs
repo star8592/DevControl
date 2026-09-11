@@ -39,3 +39,14 @@ test('registry conflict hard blocks automation', () => {
   }));
   assert.equal(plan.level, AutonomyLevel.BLOCKED);
 });
+
+test('DevControl observes itself but never auto-manages its own checkout', () => {
+  const plan = planProjectAutonomy(project({
+    name: 'DevControl',
+    repo: 'star8592/DevControl',
+    registration: { state: 'REGISTERED', configuredKey: 'devcontrol', conflicts: [] }
+  }));
+  assert.equal(plan.level, AutonomyLevel.OBSERVE);
+  assert.equal(plan.autoQualify, false);
+  assert.match(plan.reasons.join(' '), /control plane/i);
+});
