@@ -5,12 +5,13 @@ Local-first, AI-ready multi-project development control plane.
 DevControl discovers repositories on the workstation, matches GitHub remotes, classifies each
 project, infers low-risk qualification commands, safely fast-forwards clean projects, executes
 local qualification, learns project-specific playbooks, quarantines bad synced SHAs, rolls back
-only DevControl-owned failed updates, and creates standardized AI failure packets.
+only DevControl-owned failed updates, creates standardized AI failure packets, produces repair
+plans, and can optionally attempt isolated repairs without touching the project's main checkout.
 
 GitHub is the control/audit plane. The local workstation remains the authority for heavy
 qualification, GPU/Godot/Blender work, research, and runtime acceptance.
 
-## V0.6 autonomous loop
+## V0.8 autonomous loop
 
 ```text
 discover local repositories
@@ -20,24 +21,62 @@ discover local repositories
   -> refresh discovery
   -> local qualification
   -> PASS: mark known-good
-  -> FAIL after DevControl sync:
+  -> FAIL after DevControl-owned sync:
        quarantine bad SHA
-       rollback to previous clean SHA
-  -> learn command reliability and duration
-  -> generate AI failure packet
+       rollback original checkout to previous clean SHA
+  -> learn command reliability / cost
+  -> AI failure packet
+  -> PLAN_ONLY repair plan
+  -> optional isolated AUTO_FIX worktree
+       Codex workspace-write only in repair worktree
+       block risky changed paths
+       failed command must pass
+       every safe qualification command must pass
+       create dedicated local repair commit/branch
+       optional repair-branch push
+       NEVER auto-merge
   -> refresh Autonomy Dashboard
 ```
 
-The loop is serialized by one `devcontrol-reconcile.timer`. This replaces the older independent
-discovery / qualification / failure-report timers and avoids state races.
+The loop is serialized by one `devcontrol-reconcile.timer`; there are no competing discovery,
+qualification and reporter timers.
+
+## Default behavior vs explicit opt-in
+
+Safe defaults:
+
+```text
+automatic discovery                      ON
+automatic safe fast-forward sync         ON for eligible projects
+automatic local qualification            ON for eligible projects
+known-good / quarantine / rollback       ON
+AI failure packet generation             ON
+heuristic PLAN_ONLY repair planning      ON
+GitHub failure issues                    OFF
+GitHub repair-plan comments              OFF
+Codex read-only repair planner            OFF
+automatic code modification              OFF
+repair branch push                       OFF
+automatic merge                          NEVER
+production/deploy/publish/trading        NEVER
+```
+
+The two most important write switches are deliberately separate:
+
+```bash
+DEVCONTROL_AUTO_FIX=0
+DEVCONTROL_AUTO_PUSH_REPAIR_BRANCH=0
+```
+
+Turning on AutoFix does not enable push. Turning on push never enables merge.
 
 ## Safety boundaries
 
 DevControl does **not** run arbitrary discovered commands.
 
-Only commands inferred by the discovery layer and admitted by the autonomy policy can enter the
-automatic executor. Commands with deployment, publishing, production, live-money, trading,
-wallet, release, Steam, or secret-related risk are not automatically executed.
+Only commands inferred by discovery and admitted by the autonomy policy can enter the automatic
+executor. Deployment, publishing, production, live-money, trading, wallet, release, Steam, or
+secret-related commands are excluded from automatic qualification.
 
 Automatic Git sync is allowed only when:
 
@@ -49,19 +88,101 @@ Automatic Git sync is allowed only when:
 Automatic rollback is allowed only when the failing SHA was just fast-forwarded by DevControl
 and the checkout is still clean and unchanged. Local uncommitted work is never hard-reset.
 
-DevControl itself is always `OBSERVE`: the control plane never automatically syncs or qualifies
-its own checkout.
+DevControl itself is always `OBSERVE`: the control plane never automatically syncs, qualifies,
+or repairs its own checkout.
+
+## Isolated AutoFix
+
+AutoFix is experimental and disabled by default.
+
+When explicitly enabled, DevControl does **not** let Codex edit the ordinary project checkout.
+It creates:
+
+```text
+state/worktrees/<project>/<failure-signature>/
+```
+
+from the exact failed SHA and creates a dedicated branch:
+
+```text
+devcontrol/repair/<project>-<signature>
+```
+
+Codex is invoked in `workspace-write` sandbox mode inside that worktree. Its environment is
+scrubbed of variables whose names resemble tokens, keys, secrets, passwords, cookies,
+authorization, or credentials.
+
+Phase-one AutoFix blocks candidate commits when changes touch high-risk paths such as CI/CD,
+deployment/release/Steam/production/secrets or dependency manifest/lock files. It is intended for
+small source/test repairs, not environment migrations or release engineering.
+
+A candidate is committed only after:
+
+1. the exact failed command passes;
+2. all remaining safe qualification commands pass.
+
+The default result is a **local repair branch and commit**. Optional branch push is controlled by:
+
+```bash
+DEVCONTROL_AUTO_PUSH_REPAIR_BRANCH=1
+```
+
+DevControl never auto-merges that branch.
+
+## Repair Supervisor
+
+Every failure packet gets a deterministic PLAN_ONLY repair plan. By default this uses no external
+AI:
+
+```bash
+DEVCONTROL_REPAIR_PLANNER=heuristic
+```
+
+To let Codex inspect the actual repository in a read-only sandbox while producing the plan:
+
+```bash
+DEVCONTROL_REPAIR_PLANNER=codex
+```
+
+This planning phase does not modify files, create commits, push, merge, deploy, publish, release,
+or change production state.
+
+Repair plans are stored under:
+
+```text
+state/repair-plans/
+```
+
+AutoFix attempts are stored under:
+
+```text
+state/repair-attempts/
+```
+
+## GitHub / ChatGPT bridge
+
+Local failure packets are always generated. GitHub writes are opt-in:
+
+```bash
+DEVCONTROL_GITHUB_FAILURE_ISSUES=1
+DEVCONTROL_GITHUB_REPAIR_PLAN_COMMENTS=1
+```
+
+With both enabled, DevControl creates one deduplicated failure issue per failure signature and
+adds one deduplicated repair-plan comment to that same issue. This gives ChatGPT/GitHub a compact,
+standardized handoff containing the failing SHA/command, redacted evidence, history, repair plan,
+and acceptance gates.
 
 ## Zero-config discovery
 
-The default scan roots are:
+Default scan roots:
 
 ```text
 /mnt/disk1/Code
 /mnt/disk2
 ```
 
-Override them with:
+Override with:
 
 ```bash
 DEVCONTROL_DISCOVERY_ROOTS=/mnt/disk1/Code:/mnt/disk2
@@ -70,8 +191,8 @@ DEVCONTROL_DISCOVERY_MAX_DEPTH=3
 
 Detected stacks currently include Rust, Python, Node.js, Godot, Go, JVM, and CMake.
 
-A project may still be explicitly registered in `config/projects.json`, but new repositories do
-not need to be manually added before DevControl can observe and classify them.
+Projects can still be explicitly registered in `config/projects.json`, but new repositories do
+not need manual registration before DevControl can observe and classify them.
 
 ## Autonomous levels
 
@@ -83,7 +204,7 @@ QUALIFY   high-confidence safe project; automatic qualification allowed
 MANAGED   registered project with safe inferred qualification commands
 ```
 
-## Fast local install / upgrade
+## Fast install / upgrade
 
 Requires Node.js 20+ and an authenticated `gh` CLI or `GITHUB_TOKEN`.
 
@@ -92,7 +213,6 @@ cd /mnt/disk1/Code/DevControl
 git fetch origin main
 git checkout main
 git pull --ff-only
-
 npm run check
 bash scripts/install-user-service.sh
 ```
@@ -102,19 +222,13 @@ The installer creates:
 ```text
 devcontrol.service
 devcontrol-reconcile.timer
+~/.local/bin/devctl
 ```
 
-It also disables the legacy:
-
-```text
-devcontrol-discovery.timer
-devcontrol-qualify.timer
-devcontrol-failure-report.timer
-```
+The `devctl` wrapper loads the same `~/.config/devcontrol/env` used by systemd, so interactive CLI
+and background reconcile use the same canonical settings.
 
 ## Unified CLI
-
-The installer creates `~/.local/bin/devctl`.
 
 ```bash
 devctl status
@@ -126,47 +240,37 @@ devctl qualify --managed
 devctl reconcile
 
 devctl failures
-devctl quarantine-clear <project>
+devctl repairs
+devctl auto-fix
 
+devctl quarantine-clear <project>
 devctl check
 ```
 
-`devctl local` is the quickest machine-level view of discovery, autonomy, last qualification,
-known-good SHA, quarantine state, playbook statistics, and queued AI failure packets.
+`devctl local` is the quickest machine-level view of discovery, autonomy, latest qualification,
+known-good SHA, quarantine, learned playbook, AI failure packets, repair plans, and AutoFix
+attempts.
 
 ## Dashboards
 
-Main GitHub / CI dashboard:
+GitHub / CI dashboard:
 
 ```text
 http://127.0.0.1:8787/
 ```
 
-Autonomous local development dashboard:
+Autonomous local-development dashboard:
 
 ```text
 http://127.0.0.1:8787/autonomy.html
 ```
 
-The Autonomy Dashboard shows:
-
-- every discovered project;
-- autonomy level;
-- current SHA and dirty state;
-- known-good SHA;
-- sync / quarantine state;
-- latest local qualification;
-- learned run pass rate;
-- inferred safe commands;
-- AI failure packet count.
-
-Its JSON snapshot is generated locally by each reconcile cycle and is ignored by git.
+The Autonomy Dashboard is rebuilt at the end of every reconcile cycle from local generated state.
+Its data snapshot is ignored by git.
 
 ## Project Learner
 
-Every qualification updates `state/playbooks.json`.
-
-For each safe command DevControl learns:
+Every qualification updates `state/playbooks.json` with per-command:
 
 ```text
 samples
@@ -178,18 +282,12 @@ average duration
 latest exit status
 ```
 
-Future qualification order prefers commands with better historical reliability, fewer timeouts,
-and lower execution cost while remaining inside the discovery/autonomy allowlist.
+Qualification order can therefore prefer historically reliable and cheaper gates while staying
+inside the discovery/autonomy allowlist.
 
 ## AI failure queue
 
-Failed qualifications become standardized packets under:
-
-```text
-state/ai-queue/
-```
-
-A packet contains:
+Failed qualifications become standardized packets under `state/ai-queue/` with:
 
 ```text
 project / repository
@@ -202,17 +300,9 @@ command statistics
 reproduction cwd + command
 ```
 
-GitHub issue creation is opt-in:
+## Generated local state
 
-```bash
-DEVCONTROL_GITHUB_FAILURE_ISSUES=1
-```
-
-The default is local-only to avoid issue spam.
-
-## State
-
-All generated operational state stays under `state/` and is ignored by git:
+All operational state stays under `state/` and is ignored by git:
 
 ```text
 state/
@@ -222,28 +312,38 @@ state/
 ├── latest/
 ├── executions/
 ├── ai-queue/
-├── events.ndjson
-└── reported-failures.json
+├── repair-plans/
+├── repair-attempts/
+├── repair-validation/
+├── worktrees/
+├── reported-failures.json
+├── reported-repair-plans.json
+└── events.ndjson
 ```
 
-The lifecycle file carries `knownGoodSha`, pending DevControl-owned sync, quarantine state, and
-the last qualification outcome.
+## Configuration
 
-## Current GitHub / Integration capabilities
+The canonical service/CLI environment is `~/.config/devcontrol/env`.
 
-The original DevControl control plane remains available:
+Key settings:
 
-- configuration-driven project registry;
-- portfolio status;
-- GitHub workflow, PR, issue, and runner visibility;
-- Dashboard comment parsing;
-- Server-Sent Events;
-- reversible `rerun failed jobs`;
-- Integration Bridge with deny-by-default write policy;
-- local audit log;
-- Codex/OpenAI/local-tool adapter path.
+```bash
+DEVCONTROL_RECONCILE_INTERVAL_SEC=60
+DEVCONTROL_QUALIFY_TIMEOUT_MS=900000
 
-See `docs/INTEGRATIONS.md`.
+DEVCONTROL_GITHUB_FAILURE_ISSUES=0
+DEVCONTROL_GITHUB_REPAIR_PLAN_COMMENTS=0
+
+DEVCONTROL_REPAIR_PLANNER=heuristic
+DEVCONTROL_REPAIR_PLAN_TIMEOUT_MS=180000
+
+DEVCONTROL_AUTO_FIX=0
+DEVCONTROL_AUTO_FIX_TIMEOUT_MS=600000
+DEVCONTROL_AUTO_PUSH_REPAIR_BRANCH=0
+```
+
+Re-run `scripts/install-user-service.sh` after changing timer settings. For other EnvironmentFile
+values, the next oneshot reconcile reads the updated file automatically.
 
 ## Systemd operations
 
@@ -256,38 +356,35 @@ journalctl --user -u devcontrol.service -f
 journalctl --user -u devcontrol-reconcile.service -n 200 --no-pager
 ```
 
-The default reconcile interval is 60 seconds:
-
-```bash
-DEVCONTROL_RECONCILE_INTERVAL_SEC=60
-DEVCONTROL_QUALIFY_TIMEOUT_MS=900000
-```
-
-Re-run `scripts/install-user-service.sh` after changing timer settings.
-
 ## Architecture
 
 ```text
-GitHub
-  ↕
+GitHub / ChatGPT
+       ↕
 DevControl Core (localhost)
-  ├── Project Registry
   ├── Automatic Discovery
   ├── Autonomy Policy
-  ├── Safe Sync Lifecycle
+  ├── Safe Git Lifecycle
+  │    ├── fast-forward only
   │    ├── known-good
   │    ├── quarantine
   │    └── rollback
   ├── Unified Executor
   ├── Project Learner
   ├── Failure Intelligence
-  ├── AI Queue
+  ├── PLAN_ONLY Repair Supervisor
+  ├── Isolated AutoFix (opt-in)
+  │    ├── repair worktree
+  │    ├── workspace-write sandbox
+  │    ├── risky-path gate
+  │    ├── failed-command gate
+  │    └── full qualification gate
   ├── Integration Bridge
   └── Dashboards
        ↕
 Local projects
   ├── Rust / Python / Node
-  ├── Godot / GPU
+  ├── Godot / GPU / Blender
   ├── research systems
   └── future projects
 ```
@@ -295,9 +392,10 @@ Local projects
 The service binds to `127.0.0.1:8787` by default. Keep it localhost-only unless placed behind an
 authenticated reverse proxy.
 
-## Direction
+## Next direction
 
-The next layer is AI Planner / Repair Supervisor: consume failure packets plus the learned
-project playbook, propose the smallest repair, push a new GitHub commit, and let the same
-reconcile loop validate it locally. The policy boundary remains: AI may automate development
-work, but high-risk deploy/publish/trading/release actions stay outside automatic execution.
+The next step is supervised repair branch publication and PR orchestration: a validated local
+repair candidate may be pushed on its dedicated branch and opened as a PR, but merge remains a
+separate approval boundary. Project-specific visual/GPU acceptance adapters will also move into
+the learner so Godot projects can treat real renderer screenshots as first-class qualification
+artifacts instead of relying only on headless tests.
