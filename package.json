@@ -1,6 +1,6 @@
 {
   "name": "devcontrol",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -14,6 +14,7 @@
     "sync:managed": "node scripts/sync-projects.mjs --managed",
     "qualify:auto": "node scripts/qualify-projects.mjs",
     "qualify:managed": "node scripts/qualify-projects.mjs --managed",
+    "visual:probe": "node scripts/probe-visual.mjs",
     "reconcile": "node scripts/reconcile.mjs",
     "dashboard:autonomy": "node scripts/render-autonomy-dashboard.mjs",
     "failures": "node scripts/report-failures.mjs",
@@ -23,7 +24,7 @@
     "repair-review": "node scripts/review-repairs.mjs",
     "repair-cleanup": "node scripts/cleanup-repairs.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/project-discovery.mjs && node --check lib/autonomy-policy.mjs && node --check lib/project-executor.mjs && node --check lib/project-learner.mjs && node --check lib/project-lifecycle.mjs && node --check lib/local-state.mjs && node --check lib/failure-intelligence.mjs && node --check lib/repair-supervisor.mjs && node --check lib/repair-report.mjs && node --check lib/repair-executor.mjs && node --check lib/repair-candidate.mjs && node --check lib/repair-review.mjs && node --check lib/repair-cleanup.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check scripts/discover-projects.mjs && node --check scripts/sync-projects.mjs && node --check scripts/qualify-projects.mjs && node --check scripts/reconcile.mjs && node --check scripts/render-autonomy-dashboard.mjs && node --check scripts/report-failures.mjs && node --check scripts/plan-repairs.mjs && node --check scripts/auto-fix.mjs && node --check scripts/publish-repairs.mjs && node --check scripts/review-repairs.mjs && node --check scripts/cleanup-repairs.mjs && node --check scripts/devctl.mjs && node --check public/integration-console.js && node --test && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
+    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/project-discovery.mjs && node --check lib/autonomy-policy.mjs && node --check lib/project-executor.mjs && node --check lib/visual-qualification.mjs && node --check lib/qualification-pipeline.mjs && node --check lib/project-learner.mjs && node --check lib/project-lifecycle.mjs && node --check lib/local-state.mjs && node --check lib/failure-intelligence.mjs && node --check lib/repair-supervisor.mjs && node --check lib/repair-report.mjs && node --check lib/repair-executor.mjs && node --check lib/repair-candidate.mjs && node --check lib/repair-review.mjs && node --check lib/repair-cleanup.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check scripts/discover-projects.mjs && node --check scripts/sync-projects.mjs && node --check scripts/qualify-projects.mjs && node --check scripts/probe-visual.mjs && node --check scripts/reconcile.mjs && node --check scripts/render-autonomy-dashboard.mjs && node --check scripts/report-failures.mjs && node --check scripts/plan-repairs.mjs && node --check scripts/auto-fix.mjs && node --check scripts/publish-repairs.mjs && node --check scripts/review-repairs.mjs && node --check scripts/cleanup-repairs.mjs && node --check scripts/devctl.mjs && node --check public/integration-console.js && node --test && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
   },
   "engines": {
     "node": ">=20"
