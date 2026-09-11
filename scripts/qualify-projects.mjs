@@ -3,10 +3,9 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import {
-  executeProjectQualification,
-  readLatestExecution
-} from '../lib/project-executor.mjs';
+import { readLatestExecution } from '../lib/project-executor.mjs';
+import { executeQualificationPipeline } from '../lib/qualification-pipeline.mjs';
+import { visualQualificationEnabled } from '../lib/visual-qualification.mjs';
 import {
   inspectProjectGit,
   recordQualificationOutcome
@@ -34,6 +33,9 @@ const allowManaged = process.argv.includes('--managed');
 const force = process.argv.includes('--force');
 const timeoutMs = Number(
   process.env.DEVCONTROL_QUALIFY_TIMEOUT_MS || 15 * 60 * 1000
+);
+const visualTimeoutMs = Number(
+  process.env.DEVCONTROL_VISUAL_TIMEOUT_MS || 5 * 60 * 1000
 );
 
 let report;
@@ -96,18 +98,22 @@ for (const project of eligible) {
     dirty: gitState.dirty
   };
   const latest = await readLatestExecution(stateDir, key);
+  const visualEnabled = visualQualificationEnabled(executionProject);
+  const cachedVisualSatisfied = !visualEnabled || latest?.visualQualification?.status === 'PASS';
   if (
     !force &&
     latest?.status === 'PASS' &&
     latest?.project?.sha &&
-    latest.project.sha === gitState.sha
+    latest.project.sha === gitState.sha &&
+    cachedVisualSatisfied
   ) {
     results.push({
       project: key,
       status: 'SKIPPED',
-      reason: 'clean SHA already qualified',
+      reason: 'clean SHA already qualified with all currently enabled gates',
       runId: latest.runId,
-      sha: gitState.sha
+      sha: gitState.sha,
+      visualStatus: latest?.visualQualification?.status || null
     });
     continue;
   }
@@ -126,13 +132,17 @@ for (const project of eligible) {
 
   console.log(`== qualify ${key} @ ${gitState.sha.slice(0, 10)} ==`);
   for (const command of commands) console.log(`  $ ${command}`);
+  if (visualEnabled) {
+    console.log('  + visual gate: godot-vulkan-frame-capture');
+  }
 
   try {
-    const result = await executeProjectQualification({
+    const result = await executeQualificationPipeline({
       project: executionProject,
       commands,
       stateDir,
-      timeoutMs
+      timeoutMs,
+      visualTimeoutMs
     });
     const learned = await learnFromQualification({
       stateDir,
@@ -150,6 +160,8 @@ for (const project of eligible) {
       runId: result.runId,
       sha: gitState.sha,
       failedCommand: result.failedCommand,
+      visualStatus: result.visualQualification?.status || null,
+      visualEvidence: result.visualQualification?.evidence?.screenshots?.length || 0,
       runPassRate: learned.runPassRate,
       preferredQualification: learned.preferredQualification,
       lifecycle
