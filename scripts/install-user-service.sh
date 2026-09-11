@@ -7,9 +7,14 @@ SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 ENV_FILE="$CONFIG_DIR/env"
 INTEGRATIONS_FILE="$CONFIG_DIR/integrations.json"
 SERVICE_FILE="$SYSTEMD_DIR/devcontrol.service"
+DISCOVERY_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-discovery.service"
+DISCOVERY_TIMER_FILE="$SYSTEMD_DIR/devcontrol-discovery.timer"
 OWNER="${DEVCONTROL_OWNER:-star8592}"
 HOST_VALUE="${HOST:-127.0.0.1}"
 PORT_VALUE="${PORT:-8787}"
+DISCOVERY_ROOTS="${DEVCONTROL_DISCOVERY_ROOTS:-/mnt/disk1/Code:/mnt/disk2}"
+DISCOVERY_MAX_DEPTH="${DEVCONTROL_DISCOVERY_MAX_DEPTH:-3}"
+DISCOVERY_INTERVAL="${DEVCONTROL_DISCOVERY_INTERVAL_SEC:-60}"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: Node.js 20+ is required." >&2
@@ -32,7 +37,7 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-mkdir -p "$CONFIG_DIR" "$SYSTEMD_DIR"
+mkdir -p "$CONFIG_DIR" "$SYSTEMD_DIR" "$ROOT/state"
 umask 077
 
 if [ ! -f "$INTEGRATIONS_FILE" ]; then
@@ -49,6 +54,9 @@ DEVCONTROL_OWNER=$OWNER
 HOST=$HOST_VALUE
 PORT=$PORT_VALUE
 DEVCONTROL_INTEGRATIONS_FILE=$INTEGRATIONS_FILE
+DEVCONTROL_DISCOVERY_ROOTS=$DISCOVERY_ROOTS
+DEVCONTROL_DISCOVERY_MAX_DEPTH=$DISCOVERY_MAX_DEPTH
+DEVCONTROL_DISCOVERY_FILE=$ROOT/state/discovery.json
 EOF
 chmod 600 "$ENV_FILE"
 
@@ -73,8 +81,39 @@ PrivateTmp=true
 WantedBy=default.target
 EOF
 
+cat > "$DISCOVERY_SERVICE_FILE" <<EOF
+[Unit]
+Description=DevControl automatic multi-repository discovery
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$ROOT
+EnvironmentFile=$ENV_FILE
+ExecStart=$NODE_BIN $ROOT/scripts/discover-projects.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+EOF
+
+cat > "$DISCOVERY_TIMER_FILE" <<EOF
+[Unit]
+Description=Periodically discover and classify local development projects
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=${DISCOVERY_INTERVAL}s
+AccuracySec=5s
+Persistent=true
+Unit=devcontrol-discovery.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
 systemctl --user daemon-reload
 systemctl --user enable --now devcontrol.service
+systemctl --user enable --now devcontrol-discovery.timer
+systemctl --user start devcontrol-discovery.service
 systemctl --user restart devcontrol.service
 
 URL="http://$HOST_VALUE:$PORT_VALUE/api/health"
@@ -82,7 +121,9 @@ for _ in $(seq 1 30); do
   if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; then
     echo "DevControl is running: http://$HOST_VALUE:$PORT_VALUE"
     echo "Integrations: $INTEGRATIONS_FILE"
+    echo "Discovery: $ROOT/state/discovery.json every ${DISCOVERY_INTERVAL}s"
     echo "Service: systemctl --user status devcontrol.service"
+    echo "Timer:   systemctl --user status devcontrol-discovery.timer"
     exit 0
   fi
   sleep 0.25
