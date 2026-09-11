@@ -11,7 +11,13 @@
       "localWorkflows": ["DaoLife Local Lab"],
       "safety": "No secret exposure; heavy experiments only on self-hosted runner.",
       "localPath": "/mnt/disk1/Code/DaoLife",
-      "tags": ["game", "rust", "simulation"]
+      "tags": ["game", "rust", "simulation"],
+      "visualLoop": {
+        "enabled": true,
+        "workflow": "visual-loop-production.yml",
+        "workflowNames": ["DaoLife VisualLoop Qualification"],
+        "ref": "feat/visual-loop-capture"
+      }
     },
     {
       "key": "bisre",
