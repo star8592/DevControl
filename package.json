@@ -1,6 +1,6 @@
 {
   "name": "devcontrol",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -10,11 +10,14 @@
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
     "discover": "node scripts/discover-projects.mjs",
+    "sync:auto": "node scripts/sync-projects.mjs",
+    "sync:managed": "node scripts/sync-projects.mjs --managed",
     "qualify:auto": "node scripts/qualify-projects.mjs",
     "qualify:managed": "node scripts/qualify-projects.mjs --managed",
+    "reconcile": "node scripts/reconcile.mjs",
     "failures": "node scripts/report-failures.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/project-discovery.mjs && node --check lib/autonomy-policy.mjs && node --check lib/project-executor.mjs && node --check lib/project-learner.mjs && node --check lib/failure-intelligence.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check scripts/discover-projects.mjs && node --check scripts/qualify-projects.mjs && node --check scripts/report-failures.mjs && node --check scripts/devctl.mjs && node --check public/integration-console.js && node --test && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
+    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/project-discovery.mjs && node --check lib/autonomy-policy.mjs && node --check lib/project-executor.mjs && node --check lib/project-learner.mjs && node --check lib/project-lifecycle.mjs && node --check lib/local-state.mjs && node --check lib/failure-intelligence.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check scripts/discover-projects.mjs && node --check scripts/sync-projects.mjs && node --check scripts/qualify-projects.mjs && node --check scripts/reconcile.mjs && node --check scripts/report-failures.mjs && node --check scripts/devctl.mjs && node --check public/integration-console.js && node --test && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); console.log('registries json ok')\""
   },
   "engines": {
     "node": ">=20"
