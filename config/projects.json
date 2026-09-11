@@ -36,7 +36,17 @@
         "status": "capture-pipeline-hardened-target-set-draft-not-yet-run",
         "workflow": "visual-loop-production.yml",
         "workflowNames": ["DanDao VisualLoop Qualification"],
-        "ref": "feat/visual-loop-v002-current"
+        "ref": "feat/visual-loop-v002-current",
+        "judgeWeights": {
+          "composition": 0.18,
+          "scale": 0.08,
+          "furnace": 0.22,
+          "controls": 0.14,
+          "materials": 0.16,
+          "lighting": 0.10,
+          "detail": 0.08,
+          "feedback": 0.04
+        }
       }
     },
     {
