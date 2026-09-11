@@ -133,7 +133,7 @@ ConditionPathExists=$ROOT/state/discovery.json
 Type=oneshot
 WorkingDirectory=$ROOT
 EnvironmentFile=$ENV_FILE
-ExecStart=$NODE_BIN $ROOT/scripts/qualify-projects.mjs
+ExecStart=$NODE_BIN $ROOT/scripts/qualify-projects.mjs --managed
 NoNewPrivileges=true
 PrivateTmp=true
 Nice=5
@@ -167,7 +167,7 @@ for _ in $(seq 1 30); do
     echo "DevControl is running: http://$HOST_VALUE:$PORT_VALUE"
     echo "CLI:       $LOCAL_BIN/devctl"
     echo "Discovery: every ${DISCOVERY_INTERVAL}s"
-    echo "Qualify:   every ${QUALIFY_INTERVAL}s"
+    echo "Qualify:   every ${QUALIFY_INTERVAL}s (new QUALIFY + registered MANAGED projects)"
     echo "State:     $ROOT/state"
     echo "Service:   systemctl --user status devcontrol.service"
     echo "Timers:    systemctl --user list-timers 'devcontrol-*'"
