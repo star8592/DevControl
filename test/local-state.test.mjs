@@ -6,11 +6,12 @@ import test from 'node:test';
 
 import { loadLocalControlState } from '../lib/local-state.mjs';
 
-test('local control state joins discovery qualification playbook lifecycle and AI queue', async () => {
+test('local control state joins discovery qualification playbook lifecycle AI queue and repairs', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'devcontrol-state-'));
   const state = path.join(root, 'state');
   await mkdir(path.join(state, 'latest'), { recursive: true });
   await mkdir(path.join(state, 'ai-queue'), { recursive: true });
+  await mkdir(path.join(state, 'repair-plans'), { recursive: true });
 
   await writeFile(path.join(state, 'discovery.json'), JSON.stringify({
     generatedAt: '2026-01-01T00:00:00Z',
@@ -48,6 +49,20 @@ test('local control state joins discovery qualification playbook lifecycle and A
     generatedAt: '2026-01-01T00:00:00Z',
     failure: { categories: ['test_failure'], failedCommand: 'npm test' }
   }));
+  await writeFile(path.join(state, 'repair-plans', 'sig.json'), JSON.stringify({
+    signature: 'sig',
+    project: { key: 'demo', repo: 'star8592/demo', sha: 'old' },
+    runId: 'r0',
+    generatedAt: '2026-01-01T00:01:00Z',
+    mode: 'PLAN_ONLY',
+    provider: 'heuristic',
+    confidence: 0.85,
+    summary: 'Reproduce the failing test and repair the smallest regression.',
+    steps: ['Reproduce npm test'],
+    acceptance: ['npm test passes'],
+    aiAnalysis: null,
+    plannerError: null
+  }));
 
   const result = await loadLocalControlState(root);
   assert.equal(result.counts.total, 1);
@@ -55,4 +70,7 @@ test('local control state joins discovery qualification playbook lifecycle and A
   assert.equal(result.projects.demo.lifecycle.knownGoodSha, 'abc');
   assert.equal(result.projects.demo.playbook.observations, 3);
   assert.equal(result.projects.demo.failurePackets, 1);
+  assert.equal(result.repairPlans.count, 1);
+  assert.equal(result.projects.demo.latestRepairPlan.provider, 'heuristic');
+  assert.equal(result.projects.demo.latestRepairPlan.confidence, 0.85);
 });
