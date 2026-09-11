@@ -6,12 +6,13 @@ import test from 'node:test';
 
 import { loadLocalControlState } from '../lib/local-state.mjs';
 
-test('local control state joins discovery qualification playbook lifecycle AI queue and repairs', async () => {
+test('local control state joins discovery qualification lifecycle AI repair and auto-fix state', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'devcontrol-state-'));
   const state = path.join(root, 'state');
   await mkdir(path.join(state, 'latest'), { recursive: true });
   await mkdir(path.join(state, 'ai-queue'), { recursive: true });
   await mkdir(path.join(state, 'repair-plans'), { recursive: true });
+  await mkdir(path.join(state, 'repair-attempts'), { recursive: true });
 
   await writeFile(path.join(state, 'discovery.json'), JSON.stringify({
     generatedAt: '2026-01-01T00:00:00Z',
@@ -63,6 +64,20 @@ test('local control state joins discovery qualification playbook lifecycle AI qu
     aiAnalysis: null,
     plannerError: null
   }));
+  await writeFile(path.join(state, 'repair-attempts', 'sig.json'), JSON.stringify({
+    schemaVersion: 1,
+    project: 'demo',
+    repo: 'star8592/demo',
+    signature: 'sig',
+    failureSha: 'old',
+    attemptedAt: '2026-01-01T00:02:00Z',
+    status: 'CANDIDATE_READY',
+    branch: 'devcontrol/repair/demo-sig',
+    worktree: '/tmp/worktree',
+    repairSha: 'repairsha',
+    changedPaths: ['src/app.js'],
+    pushed: false
+  }));
 
   const result = await loadLocalControlState(root);
   assert.equal(result.counts.total, 1);
@@ -73,4 +88,7 @@ test('local control state joins discovery qualification playbook lifecycle AI qu
   assert.equal(result.repairPlans.count, 1);
   assert.equal(result.projects.demo.latestRepairPlan.provider, 'heuristic');
   assert.equal(result.projects.demo.latestRepairPlan.confidence, 0.85);
+  assert.equal(result.repairAttempts.count, 1);
+  assert.equal(result.projects.demo.latestRepairAttempt.status, 'CANDIDATE_READY');
+  assert.equal(result.projects.demo.latestRepairAttempt.repairSha, 'repairsha');
 });
