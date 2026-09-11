@@ -15,6 +15,7 @@ const selected = process.argv.includes('--project')
   : null;
 const codexTimeoutMs = Number(process.env.DEVCONTROL_AUTO_FIX_TIMEOUT_MS || 600000);
 const qualifyTimeoutMs = Number(process.env.DEVCONTROL_QUALIFY_TIMEOUT_MS || 900000);
+const visualTimeoutMs = Number(process.env.DEVCONTROL_VISUAL_TIMEOUT_MS || 300000);
 
 async function readJson(filePath, fallback = null) {
   try {
@@ -98,6 +99,7 @@ for (const plan of plans) {
       stateDir,
       codexTimeoutMs,
       qualifyTimeoutMs,
+      visualTimeoutMs,
       pushBranch
     });
   } catch (error) {
