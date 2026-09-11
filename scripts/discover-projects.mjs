@@ -2,6 +2,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { attachAutonomyPlans } from '../lib/autonomy-policy.mjs';
 import { discoverProjects, writeDiscoveryReport } from '../lib/project-discovery.mjs';
 import { loadProjectRegistry } from '../lib/project-registry.mjs';
 
@@ -25,11 +26,12 @@ const maxDepth = Number(
 const output =
   argValue('--output') || process.env.DEVCONTROL_DISCOVERY_FILE || 'state/discovery.json';
 
-const report = await discoverProjects({
+const rawReport = await discoverProjects({
   roots,
   maxDepth,
   configuredProjects: registry.projects
 });
+const report = attachAutonomyPlans(rawReport);
 const target = await writeDiscoveryReport(baseDir, report, output);
 
 console.log(JSON.stringify({
@@ -43,7 +45,9 @@ console.log(JSON.stringify({
       localPath: project.localPath,
       repo: project.repo,
       stacks: project.stacks,
-      confidence: project.confidence
+      confidence: project.confidence,
+      autonomy: project.autonomy.level,
+      safeCommands: project.autonomy.safeCommands
     })),
   conflicts: report.projects
     .filter(project => project.registration.state === 'CONFLICT')
