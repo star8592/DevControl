@@ -7,7 +7,7 @@
     "start": "node server.mjs",
     "dev": "node --watch server.mjs",
     "test": "node --test",
-    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check lib/visual-loop/core.mjs && node --check lib/visual-loop/dispatch.mjs && node --check lib/visual-loop/contract.mjs && node --check lib/visual-loop/judge.mjs && node --check lib/visual-loop/round.mjs && node --check lib/visual-loop/store.mjs && node --check public/integration-console.js && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); JSON.parse(fs.readFileSync('config/visual-loop.example.json','utf8')); console.log('registries json ok')\""
+    "check": "node --check server.mjs && node --check lib/project-registry.mjs && node --check lib/integration-registry.mjs && node --check lib/audit-log.mjs && node --check lib/local-integration-bridge.mjs && node --check lib/visual-loop/core.mjs && node --check lib/visual-loop/dispatch.mjs && node --check lib/visual-loop/contract.mjs && node --check lib/visual-loop/judge.mjs && node --check lib/visual-loop/round.mjs && node --check lib/visual-loop/store.mjs && node --check scripts/visual-loop-evaluate.mjs && node --check public/integration-console.js && node -e \"const fs=require('fs'); JSON.parse(fs.readFileSync('config/projects.json','utf8')); JSON.parse(fs.readFileSync('config/integrations.json','utf8')); JSON.parse(fs.readFileSync('config/visual-loop.example.json','utf8')); console.log('registries json ok')\""
   },
   "engines": {
     "node": ">=20"
