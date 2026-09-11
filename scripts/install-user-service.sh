@@ -33,6 +33,7 @@ REPAIR_PLAN_TIMEOUT="${DEVCONTROL_REPAIR_PLAN_TIMEOUT_MS:-180000}"
 AUTO_FIX="${DEVCONTROL_AUTO_FIX:-0}"
 AUTO_FIX_TIMEOUT="${DEVCONTROL_AUTO_FIX_TIMEOUT_MS:-600000}"
 AUTO_PUSH_REPAIR="${DEVCONTROL_AUTO_PUSH_REPAIR_BRANCH:-0}"
+AUTO_CREATE_REPAIR_PR="${DEVCONTROL_AUTO_CREATE_REPAIR_PR:-0}"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: Node.js 20+ is required." >&2
@@ -85,6 +86,7 @@ DEVCONTROL_REPAIR_PLAN_TIMEOUT_MS=$REPAIR_PLAN_TIMEOUT
 DEVCONTROL_AUTO_FIX=$AUTO_FIX
 DEVCONTROL_AUTO_FIX_TIMEOUT_MS=$AUTO_FIX_TIMEOUT
 DEVCONTROL_AUTO_PUSH_REPAIR_BRANCH=$AUTO_PUSH_REPAIR
+DEVCONTROL_AUTO_CREATE_REPAIR_PR=$AUTO_CREATE_REPAIR_PR
 EOF
 chmod 600 "$ENV_FILE"
 
@@ -168,7 +170,7 @@ for _ in $(seq 1 30); do
     echo "CLI:        $LOCAL_BIN/devctl"
     echo "Reconcile:  every ${RECONCILE_INTERVAL}s"
     echo "Planner:    ${REPAIR_PLANNER} (PLAN_ONLY)"
-    echo "AutoFix:    ${AUTO_FIX}; push repair branch=${AUTO_PUSH_REPAIR}"
+    echo "AutoFix:    ${AUTO_FIX}; push repair branch=${AUTO_PUSH_REPAIR}; draft PR=${AUTO_CREATE_REPAIR_PR}"
     echo "State:      $ROOT/state"
     echo "Service:    systemctl --user status devcontrol.service"
     echo "Timer:      systemctl --user status devcontrol-reconcile.timer"
