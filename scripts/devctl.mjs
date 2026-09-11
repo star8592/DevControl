@@ -19,6 +19,7 @@ const [command = 'status', ...args] = process.argv.slice(2);
 
 if (command === 'discover') run('scripts/discover-projects.mjs', args);
 if (command === 'qualify') run('scripts/qualify-projects.mjs', args);
+if (command === 'failures') run('scripts/report-failures.mjs', args);
 if (command === 'check') {
   const result = spawnSync('npm', ['run', 'check'], {
     cwd: baseDir,
@@ -41,5 +42,5 @@ if (command === 'status') {
 }
 
 console.error(`Unknown command: ${command}`);
-console.error('Commands: discover, qualify, status, check');
+console.error('Commands: discover, qualify, failures, status, check');
 process.exit(2);
