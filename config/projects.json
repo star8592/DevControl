@@ -46,7 +46,7 @@
       "dashboardIssue": 26,
       "phase": "Production Shadow",
       "nextAction": "Continue read-only shadow; stop before Micro-Live",
-      "lightWorkflows": [],
+      "lightWorkflows": ["BISRE Local PR Gate", "Local PR Gate"],
       "localWorkflows": ["BISRE Main Production Shadow", "Main Production Shadow"],
       "safety": "Never alter frozen data or enable real-capital trading.",
       "localPath": "/mnt/disk1/Code/bisre-full/bisre",
