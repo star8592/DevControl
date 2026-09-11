@@ -98,6 +98,7 @@ test('Godot Vulkan adapter captures PNG evidence and passes configured gates', a
   assert.equal(result.evidence.screenshots.length, 1);
   assert.equal(result.evidence.screenshots[0].width, 1920);
   assert.equal(result.evidence.screenshots[0].height, 1080);
+  assert.match(result.command, /--resolution 1920x1080/);
 });
 
 test('visual gate fails when captured evidence misses required resolution', async () => {
@@ -118,6 +119,54 @@ test('visual gate fails when captured evidence misses required resolution', asyn
   assert.equal(result.status, 'FAIL');
   assert.equal(result.gates.resolution, false);
   assert.match(result.failureReasons.join('\n'), /2560x1440/);
+});
+
+test('unique nested Godot root is inferred when projectPath is omitted', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'devcontrol-visual-nested-'));
+  const game = path.join(root, 'godot');
+  const stateDir = path.join(root, 'state');
+  await mkdir(game, { recursive: true });
+  await writeFile(path.join(game, 'project.godot'), '[application]\n', 'utf8');
+  const binary = await fakeGodot(root);
+  const project = projectFixture(root, binary);
+  project.godotProjectPaths = ['godot'];
+  delete project.registration.visualQualification.projectPath;
+
+  const probe = await probeVisualQualification(project);
+  assert.equal(probe.state, 'READY');
+  assert.equal(probe.projectPath, 'godot');
+  assert.equal(probe.projectPathInferred, true);
+
+  const result = await executeVisualQualification({
+    project,
+    stateDir,
+    runId: 'run-nested',
+    timeoutMs: 10000
+  });
+  assert.equal(result.status, 'PASS');
+  assert.equal(result.projectPath, game);
+  assert.equal(result.projectPathInferred, true);
+});
+
+test('multiple Godot roots require an explicit projectPath before execution', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'devcontrol-visual-multi-'));
+  const binary = await fakeGodot(root);
+  const project = projectFixture(root, binary);
+  project.godotProjectPaths = ['game-a', 'game-b'];
+  delete project.registration.visualQualification.projectPath;
+
+  const probe = await probeVisualQualification(project);
+  assert.equal(probe.state, 'NEEDS_PROJECT_PATH');
+  assert.match(probe.reason, /multiple Godot project roots/);
+
+  const result = await executeVisualQualification({
+    project,
+    stateDir: path.join(root, 'state'),
+    runId: 'run-multi',
+    timeoutMs: 10000
+  });
+  assert.equal(result.status, 'FAIL');
+  assert.match(result.failureReasons.join('\n'), /projectPath/);
 });
 
 test('visual policy remains opt-in', () => {
