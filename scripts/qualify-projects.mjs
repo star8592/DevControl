@@ -8,6 +8,10 @@ import {
   readLatestExecution
 } from '../lib/project-executor.mjs';
 import {
+  inspectProjectGit,
+  recordQualificationOutcome
+} from '../lib/project-lifecycle.mjs';
+import {
   chooseQualificationCommands,
   learnFromQualification,
   loadProjectPlaybook
@@ -62,29 +66,65 @@ if (!eligible.length) {
 const results = [];
 for (const project of eligible) {
   const key = project.registration?.configuredKey || project.key;
-  const executionProject = { ...project, key };
+  let gitState;
+  try {
+    gitState = inspectProjectGit(project);
+  } catch (error) {
+    results.push({
+      project: key,
+      status: 'ERROR',
+      error: String(error.message || error)
+    });
+    continue;
+  }
+
+  if (gitState.dirty) {
+    results.push({
+      project: key,
+      status: 'SKIPPED',
+      reason: 'working tree is dirty; automatic qualification will not execute',
+      sha: gitState.sha
+    });
+    continue;
+  }
+
+  const executionProject = {
+    ...project,
+    key,
+    sha: gitState.sha,
+    branch: gitState.branch,
+    dirty: gitState.dirty
+  };
   const latest = await readLatestExecution(stateDir, key);
   if (
     !force &&
-    !project.dirty &&
     latest?.status === 'PASS' &&
     latest?.project?.sha &&
-    latest.project.sha === project.sha
+    latest.project.sha === gitState.sha
   ) {
     results.push({
       project: key,
       status: 'SKIPPED',
       reason: 'clean SHA already qualified',
       runId: latest.runId,
-      sha: project.sha
+      sha: gitState.sha
     });
     continue;
   }
-  const playbook = await loadProjectPlaybook(stateDir, key);
-  const commands = chooseQualificationCommands(project, playbook);
-  if (!commands.length) continue;
 
-  console.log(`== qualify ${key} ==`);
+  const playbook = await loadProjectPlaybook(stateDir, key);
+  const commands = chooseQualificationCommands(executionProject, playbook);
+  if (!commands.length) {
+    results.push({
+      project: key,
+      status: 'SKIPPED',
+      reason: 'no safe qualification commands available',
+      sha: gitState.sha
+    });
+    continue;
+  }
+
+  console.log(`== qualify ${key} @ ${gitState.sha.slice(0, 10)} ==`);
   for (const command of commands) console.log(`  $ ${command}`);
 
   try {
@@ -99,18 +139,26 @@ for (const project of eligible) {
       project: executionProject,
       result
     });
+    const lifecycle = await recordQualificationOutcome({
+      stateDir,
+      project: executionProject,
+      result
+    });
     results.push({
       project: key,
       status: result.status,
       runId: result.runId,
+      sha: gitState.sha,
       failedCommand: result.failedCommand,
       runPassRate: learned.runPassRate,
-      preferredQualification: learned.preferredQualification
+      preferredQualification: learned.preferredQualification,
+      lifecycle
     });
   } catch (error) {
     results.push({
       project: key,
       status: 'ERROR',
+      sha: gitState.sha,
       error: String(error.message || error)
     });
   }
