@@ -1,160 +1,303 @@
 # DevControl
 
-Local-first, configuration-driven project control console.
+Local-first, AI-ready multi-project development control plane.
 
-DevControl started with `DaoLife`, `BISRE`, `CrossAlpha`, and `Tidebound`, but the core is now generic: projects are loaded from `config/projects.json` instead of being hard-coded into the server.
+DevControl discovers repositories on the workstation, matches GitHub remotes, classifies each
+project, infers low-risk qualification commands, safely fast-forwards clean projects, executes
+local qualification, learns project-specific playbooks, quarantines bad synced SHAs, rolls back
+only DevControl-owned failed updates, and creates standardized AI failure packets.
 
-GitHub remains the control/audit plane. Self-hosted runners remain the authority for heavy qualification, research, release qualification, and local promotion.
+GitHub is the control/audit plane. The local workstation remains the authority for heavy
+qualification, GPU/Godot/Blender work, research, and runtime acceptance.
 
-## Current capabilities
+## V0.6 autonomous loop
 
-- configuration-driven project registry
-- one-page multi-project portfolio status
-- lightweight/web CI and self-hosted acceptance shown separately
-- latest workflow run, branch and commit SHA
-- open PR and Automation Dashboard visibility
-- self-hosted runner visibility when GitHub permissions allow it
-- live parsing of standardized Dashboard `STATUS / PHASE / BLOCKER / NEXT / COST`
-- runner-offline and long-running/queued workflow warnings
-- automatic refresh every 15 seconds
-- GitHub credential kept server-side only
-- reversible `rerun failed jobs` control
-- lightweight syntax + health + portfolio aggregation CI for DevControl itself
-
-## Add another project
-
-Edit `config/projects.json` and add another object:
-
-```json
-{
-  "key": "example",
-  "name": "Example Project",
-  "repo": "owner/repository",
-  "dashboardIssue": 1,
-  "phase": "Development",
-  "nextAction": "Run the next safe gate",
-  "lightWorkflows": ["CI"],
-  "localWorkflows": ["Local Qualification"],
-  "localPath": "/path/to/local/repository",
-  "tags": ["example"],
-  "safety": "Project-specific safety boundary."
-}
+```text
+discover local repositories
+  -> infer stack + safe qualification
+  -> OBSERVE / SHADOW / QUALIFY / MANAGED
+  -> safe fast-forward sync
+  -> refresh discovery
+  -> local qualification
+  -> PASS: mark known-good
+  -> FAIL after DevControl sync:
+       quarantine bad SHA
+       rollback to previous clean SHA
+  -> learn command reliability and duration
+  -> generate AI failure packet
+  -> refresh Autonomy Dashboard
 ```
 
-Restart DevControl after changing the registry. A custom registry can also be selected with `DEVCONTROL_PROJECTS_FILE`.
+The loop is serialized by one `devcontrol-reconcile.timer`. This replaces the older independent
+discovery / qualification / failure-report timers and avoids state races.
 
-## Fast local install
+## Safety boundaries
 
-Requires Node.js 20+. If GitHub CLI is already authenticated, the installer can reuse `gh auth token`; otherwise export `GITHUB_TOKEN` first.
+DevControl does **not** run arbitrary discovered commands.
+
+Only commands inferred by the discovery layer and admitted by the autonomy policy can enter the
+automatic executor. Commands with deployment, publishing, production, live-money, trading,
+wallet, release, Steam, or secret-related risk are not automatically executed.
+
+Automatic Git sync is allowed only when:
+
+- the working tree is clean;
+- HEAD is on a named branch;
+- the remote update is a strict fast-forward;
+- the target SHA is not quarantined.
+
+Automatic rollback is allowed only when the failing SHA was just fast-forwarded by DevControl
+and the checkout is still clean and unchanged. Local uncommitted work is never hard-reset.
+
+DevControl itself is always `OBSERVE`: the control plane never automatically syncs or qualifies
+its own checkout.
+
+## Zero-config discovery
+
+The default scan roots are:
+
+```text
+/mnt/disk1/Code
+/mnt/disk2
+```
+
+Override them with:
 
 ```bash
-git clone https://github.com/star8592/DevControl.git
-cd DevControl
+DEVCONTROL_DISCOVERY_ROOTS=/mnt/disk1/Code:/mnt/disk2
+DEVCONTROL_DISCOVERY_MAX_DEPTH=3
+```
+
+Detected stacks currently include Rust, Python, Node.js, Godot, Go, JVM, and CMake.
+
+A project may still be explicitly registered in `config/projects.json`, but new repositories do
+not need to be manually added before DevControl can observe and classify them.
+
+## Autonomous levels
+
+```text
+BLOCKED   registry/path conflict or hard safety boundary
+OBSERVE   collect metadata only
+SHADOW    observe and learn; do not execute qualification
+QUALIFY   high-confidence safe project; automatic qualification allowed
+MANAGED   registered project with safe inferred qualification commands
+```
+
+## Fast local install / upgrade
+
+Requires Node.js 20+ and an authenticated `gh` CLI or `GITHUB_TOKEN`.
+
+```bash
+cd /mnt/disk1/Code/DevControl
+git fetch origin main
+git checkout main
+git pull --ff-only
+
+npm run check
 bash scripts/install-user-service.sh
 ```
 
-Then open:
+The installer creates:
 
 ```text
-http://127.0.0.1:8787
+devcontrol.service
+devcontrol-reconcile.timer
 ```
 
-Inspect service:
+It also disables the legacy:
+
+```text
+devcontrol-discovery.timer
+devcontrol-qualify.timer
+devcontrol-failure-report.timer
+```
+
+## Unified CLI
+
+The installer creates `~/.local/bin/devctl`.
+
+```bash
+devctl status
+devctl local
+
+devctl discover
+devctl sync --managed
+devctl qualify --managed
+devctl reconcile
+
+devctl failures
+devctl quarantine-clear <project>
+
+devctl check
+```
+
+`devctl local` is the quickest machine-level view of discovery, autonomy, last qualification,
+known-good SHA, quarantine state, playbook statistics, and queued AI failure packets.
+
+## Dashboards
+
+Main GitHub / CI dashboard:
+
+```text
+http://127.0.0.1:8787/
+```
+
+Autonomous local development dashboard:
+
+```text
+http://127.0.0.1:8787/autonomy.html
+```
+
+The Autonomy Dashboard shows:
+
+- every discovered project;
+- autonomy level;
+- current SHA and dirty state;
+- known-good SHA;
+- sync / quarantine state;
+- latest local qualification;
+- learned run pass rate;
+- inferred safe commands;
+- AI failure packet count.
+
+Its JSON snapshot is generated locally by each reconcile cycle and is ignored by git.
+
+## Project Learner
+
+Every qualification updates `state/playbooks.json`.
+
+For each safe command DevControl learns:
+
+```text
+samples
+passes
+failures
+timeouts
+pass rate
+average duration
+latest exit status
+```
+
+Future qualification order prefers commands with better historical reliability, fewer timeouts,
+and lower execution cost while remaining inside the discovery/autonomy allowlist.
+
+## AI failure queue
+
+Failed qualifications become standardized packets under:
+
+```text
+state/ai-queue/
+```
+
+A packet contains:
+
+```text
+project / repository
+SHA / run ID
+failed command
+failure categories
+redacted log excerpt
+historical pass rate
+command statistics
+reproduction cwd + command
+```
+
+GitHub issue creation is opt-in:
+
+```bash
+DEVCONTROL_GITHUB_FAILURE_ISSUES=1
+```
+
+The default is local-only to avoid issue spam.
+
+## State
+
+All generated operational state stays under `state/` and is ignored by git:
+
+```text
+state/
+├── discovery.json
+├── project-lifecycle.json
+├── playbooks.json
+├── latest/
+├── executions/
+├── ai-queue/
+├── events.ndjson
+└── reported-failures.json
+```
+
+The lifecycle file carries `knownGoodSha`, pending DevControl-owned sync, quarantine state, and
+the last qualification outcome.
+
+## Current GitHub / Integration capabilities
+
+The original DevControl control plane remains available:
+
+- configuration-driven project registry;
+- portfolio status;
+- GitHub workflow, PR, issue, and runner visibility;
+- Dashboard comment parsing;
+- Server-Sent Events;
+- reversible `rerun failed jobs`;
+- Integration Bridge with deny-by-default write policy;
+- local audit log;
+- Codex/OpenAI/local-tool adapter path.
+
+See `docs/INTEGRATIONS.md`.
+
+## Systemd operations
 
 ```bash
 systemctl --user status devcontrol.service
-journalctl --user -u devcontrol.service -n 100 --no-pager
+systemctl --user status devcontrol-reconcile.timer
+systemctl --user list-timers 'devcontrol-*'
+
+journalctl --user -u devcontrol.service -f
+journalctl --user -u devcontrol-reconcile.service -n 200 --no-pager
 ```
 
-## APIs
+The default reconcile interval is 60 seconds:
 
 ```bash
-curl http://127.0.0.1:8787/api/health
-curl http://127.0.0.1:8787/api/status
-curl http://127.0.0.1:8787/api/projects
+DEVCONTROL_RECONCILE_INTERVAL_SEC=60
+DEVCONTROL_QUALIFY_TIMEOUT_MS=900000
 ```
 
-## Token permissions
-
-For private repositories, use a fine-grained GitHub token with access to the relevant repositories.
-
-Read capabilities currently used:
-
-- repository metadata
-- Actions workflow runs
-- issues and comments
-- pull requests
-- runners, when permitted
-
-Optional write capability:
-
-- Actions: write — currently only required for the reversible `rerun failed jobs` control
-
-The token is never embedded into `public/index.html` and is not returned by `/api/status`. The installer stores it in `~/.config/devcontrol/env` with mode `600`.
-
-## Integration Bridge
-
-AI and local applications are planned as capability-scoped adapters instead of unrestricted shell execution.
-
-See `docs/INTEGRATIONS.md` and `config/integrations.example.json`.
-
-Recommended priorities on a Linux control host:
-
-1. Codex CLI adapter for bounded coding tasks
-2. OpenAI API chat/planning adapter
-3. optional local OpenAI-compatible model for low-risk summaries/triage
-4. read-only `git` / `gh` adapters
-5. editor launcher such as VS Code
-6. OS-specific GUI launchers only as optional conveniences
-
-The browser must never be able to submit arbitrary shell commands. Project paths come from the trusted registry, write actions are deny-by-default, and every write action should be auditable.
-
-## Control model
-
-Current control surface intentionally allows only reversible actions:
-
-- refresh state
-- open project Dashboard issue / latest parsed status comment
-- open latest Actions run
-- rerun failed workflow jobs
-
-High-risk controls are intentionally excluded:
-
-- no automatic PR merge
-- no Steam publishing / SteamPipe upload
-- no BISRE Micro-Live or real-capital trading
-- no frozen historical data mutation
-- no CrossAlpha production-writer switchover
-- no secret mutation
+Re-run `scripts/install-user-service.sh` after changing timer settings.
 
 ## Architecture
 
 ```text
-Browser
-  -> DevControl Core (localhost)
-      -> Project Registry
-      -> Provider adapters
-          -> GitHub API / Issues / PRs / Actions
-          -> self-hosted runner execution
-      -> Integration Bridge
-          -> Codex / OpenAI / local model
-          -> git / gh / editor launchers
-      -> Audit + approval policy
+GitHub
+  ↕
+DevControl Core (localhost)
+  ├── Project Registry
+  ├── Automatic Discovery
+  ├── Autonomy Policy
+  ├── Safe Sync Lifecycle
+  │    ├── known-good
+  │    ├── quarantine
+  │    └── rollback
+  ├── Unified Executor
+  ├── Project Learner
+  ├── Failure Intelligence
+  ├── AI Queue
+  ├── Integration Bridge
+  └── Dashboards
+       ↕
+Local projects
+  ├── Rust / Python / Node
+  ├── Godot / GPU
+  ├── research systems
+  └── future projects
 ```
 
-The service binds to `127.0.0.1:8787` by default. If remote access is needed, keep DevControl bound to localhost and put it behind an authenticated reverse proxy rather than exposing it directly.
+The service binds to `127.0.0.1:8787` by default. Keep it localhost-only unless placed behind an
+authenticated reverse proxy.
 
-GitHub-hosted CI for DevControl itself is deliberately lightweight. Heavy project compute remains local/self-hosted.
+## Direction
 
-## Roadmap
-
-Track development in issue #1, `DevControl Dashboard / Roadmap`.
-
-Current priorities:
-
-1. integration registry + safe local bridge
-2. audit log for every control action
-3. Server-Sent Events for push-like updates
-4. Codex task adapter
-5. project-level pause/resume and approval policies
-6. provider adapters beyond GitHub
+The next layer is AI Planner / Repair Supervisor: consume failure packets plus the learned
+project playbook, propose the smallest repair, push a new GitHub commit, and let the same
+reconcile loop validate it locally. The policy boundary remains: AI may automate development
+work, but high-risk deploy/publish/trading/release actions stay outside automatic execution.
