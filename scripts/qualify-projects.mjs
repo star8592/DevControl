@@ -3,7 +3,10 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { executeProjectQualification } from '../lib/project-executor.mjs';
+import {
+  executeProjectQualification,
+  readLatestExecution
+} from '../lib/project-executor.mjs';
 import {
   chooseQualificationCommands,
   learnFromQualification,
@@ -24,6 +27,7 @@ const selected = process.argv.includes('--project')
   ? process.argv[process.argv.indexOf('--project') + 1]
   : null;
 const allowManaged = process.argv.includes('--managed');
+const force = process.argv.includes('--force');
 const timeoutMs = Number(
   process.env.DEVCONTROL_QUALIFY_TIMEOUT_MS || 15 * 60 * 1000
 );
@@ -59,6 +63,23 @@ const results = [];
 for (const project of eligible) {
   const key = project.registration?.configuredKey || project.key;
   const executionProject = { ...project, key };
+  const latest = await readLatestExecution(stateDir, key);
+  if (
+    !force &&
+    !project.dirty &&
+    latest?.status === 'PASS' &&
+    latest?.project?.sha &&
+    latest.project.sha === project.sha
+  ) {
+    results.push({
+      project: key,
+      status: 'SKIPPED',
+      reason: 'clean SHA already qualified',
+      runId: latest.runId,
+      sha: project.sha
+    });
+    continue;
+  }
   const playbook = await loadProjectPlaybook(stateDir, key);
   const commands = chooseQualificationCommands(project, playbook);
   if (!commands.length) continue;
@@ -95,5 +116,6 @@ for (const project of eligible) {
   }
 }
 
-console.log(JSON.stringify({ ok: results.every(x => x.status === 'PASS'), results }, null, 2));
-process.exit(results.every(x => x.status === 'PASS') ? 0 : 1);
+const ok = results.every(x => ['PASS', 'SKIPPED'].includes(x.status));
+console.log(JSON.stringify({ ok, results }, null, 2));
+process.exit(ok ? 0 : 1);
