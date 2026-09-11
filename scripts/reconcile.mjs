@@ -26,6 +26,7 @@ run('scripts/plan-repairs.mjs', [], { allowFailure: true });
 run('scripts/auto-fix.mjs', [], { allowFailure: true });
 run('scripts/publish-repairs.mjs', [], { allowFailure: true });
 run('scripts/review-repairs.mjs', [], { allowFailure: true });
+run('scripts/cleanup-repairs.mjs', [], { allowFailure: true });
 run('scripts/render-autonomy-dashboard.mjs', [], { allowFailure: true });
 
 if (qualify !== 0) {
