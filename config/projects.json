@@ -24,16 +24,18 @@
       "name": "DanDao",
       "repo": "star8592/DanDao",
       "phase": "V0.0.2 Ancient Fire Control",
-      "nextAction": "Produce five real Godot Room3D role captures, install/verify approved furnace binary, then freeze role-specific targets",
+      "nextAction": "Run five canonical Godot production views, resolve the exact approved furnace binary, then freeze byte-verified role targets and judge",
       "lightWorkflows": [],
-      "localWorkflows": [],
+      "localWorkflows": ["DanDao VisualLoop Qualification"],
       "safety": "Godot 4.7.2 Forward+ canonical authored-scene evidence only; no Blender/editor/FAST/fallback image may qualify final art.",
       "localPath": "/mnt/disk1/Code/DanDao",
       "tags": ["game", "godot", "alchemy", "visual-loop"],
       "visualLoop": {
-        "enabled": false,
-        "status": "draft-contract-gated-capture-pending",
-        "ref": "feat/v0.0.2-ancient-fire-control"
+        "enabled": true,
+        "status": "production-capture-ready-target-contract-draft",
+        "workflow": "visual-loop-production.yml",
+        "workflowNames": ["DanDao VisualLoop Qualification"],
+        "ref": "feat/visual-loop-v002-current"
       }
     },
     {
