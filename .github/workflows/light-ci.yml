@@ -19,6 +19,8 @@ jobs:
           node-version: '20'
       - name: Syntax and registry checks
         run: npm run check
+      - name: Unit tests
+        run: npm test
       - name: Service and safety smoke
         run: |
           set -euo pipefail
