@@ -20,6 +20,23 @@
       }
     },
     {
+      "key": "dandao",
+      "name": "DanDao",
+      "repo": "star8592/DanDao",
+      "phase": "V0.0.2 Ancient Fire Control",
+      "nextAction": "Qualify five-role Room3D VisualLoop capture set and freeze role-specific visual targets",
+      "lightWorkflows": [],
+      "localWorkflows": [],
+      "safety": "Godot 4.7.2 Forward+ production evidence only; no Blender/editor/fallback image may qualify final art.",
+      "localPath": "/mnt/disk1/Code/DanDao",
+      "tags": ["game", "godot", "alchemy", "visual-loop"],
+      "visualLoop": {
+        "enabled": false,
+        "status": "capture-ready-dispatch-pending",
+        "ref": "feat/visual-loop-pilot"
+      }
+    },
+    {
       "key": "bisre",
       "name": "BISRE",
       "repo": "star8592/bisre",
