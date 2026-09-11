@@ -11,6 +11,15 @@ RECONCILE_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-reconcile.service"
 RECONCILE_TIMER_FILE="$SYSTEMD_DIR/devcontrol-reconcile.timer"
 LOCAL_BIN="${HOME}/.local/bin"
 
+# Preserve existing DevControl settings across upgrades. Explicit environment
+# variables supplied to this installer may still override them.
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
+
 OWNER="${DEVCONTROL_OWNER:-star8592}"
 HOST_VALUE="${HOST:-127.0.0.1}"
 PORT_VALUE="${PORT:-8787}"
@@ -19,6 +28,8 @@ DISCOVERY_MAX_DEPTH="${DEVCONTROL_DISCOVERY_MAX_DEPTH:-3}"
 RECONCILE_INTERVAL="${DEVCONTROL_RECONCILE_INTERVAL_SEC:-60}"
 QUALIFY_TIMEOUT="${DEVCONTROL_QUALIFY_TIMEOUT_MS:-900000}"
 GITHUB_FAILURE_ISSUES="${DEVCONTROL_GITHUB_FAILURE_ISSUES:-0}"
+REPAIR_PLANNER="${DEVCONTROL_REPAIR_PLANNER:-heuristic}"
+REPAIR_PLAN_TIMEOUT="${DEVCONTROL_REPAIR_PLAN_TIMEOUT_MS:-180000}"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: Node.js 20+ is required." >&2
@@ -62,8 +73,11 @@ DEVCONTROL_DISCOVERY_ROOTS=$DISCOVERY_ROOTS
 DEVCONTROL_DISCOVERY_MAX_DEPTH=$DISCOVERY_MAX_DEPTH
 DEVCONTROL_DISCOVERY_FILE=$ROOT/state/discovery.json
 DEVCONTROL_STATE_DIR=$ROOT/state
+DEVCONTROL_RECONCILE_INTERVAL_SEC=$RECONCILE_INTERVAL
 DEVCONTROL_QUALIFY_TIMEOUT_MS=$QUALIFY_TIMEOUT
 DEVCONTROL_GITHUB_FAILURE_ISSUES=$GITHUB_FAILURE_ISSUES
+DEVCONTROL_REPAIR_PLANNER=$REPAIR_PLANNER
+DEVCONTROL_REPAIR_PLAN_TIMEOUT_MS=$REPAIR_PLAN_TIMEOUT
 EOF
 chmod 600 "$ENV_FILE"
 
@@ -125,7 +139,7 @@ Unit=devcontrol-reconcile.service
 WantedBy=timers.target
 EOF
 
-# V0.6 replaces the three independent timers with one serialized reconcile loop.
+# V0.6+ replaces the three independent timers with one serialized reconcile loop.
 systemctl --user disable --now \
   devcontrol-discovery.timer \
   devcontrol-qualify.timer \
@@ -144,6 +158,7 @@ for _ in $(seq 1 30); do
     echo "Autonomy:   http://$HOST_VALUE:$PORT_VALUE/autonomy.html"
     echo "CLI:        $LOCAL_BIN/devctl"
     echo "Reconcile:  every ${RECONCILE_INTERVAL}s"
+    echo "Planner:    ${REPAIR_PLANNER} (PLAN_ONLY)"
     echo "State:      $ROOT/state"
     echo "Service:    systemctl --user status devcontrol.service"
     echo "Timer:      systemctl --user status devcontrol-reconcile.timer"
