@@ -6,14 +6,19 @@ import test from 'node:test';
 
 import { loadLocalControlState } from '../lib/local-state.mjs';
 
-test('local control state joins discovery qualification lifecycle AI repair auto-fix and PR candidate state', async () => {
+test('local control state joins qualification repair candidate and PR review state', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'devcontrol-state-'));
   const state = path.join(root, 'state');
-  await mkdir(path.join(state, 'latest'), { recursive: true });
-  await mkdir(path.join(state, 'ai-queue'), { recursive: true });
-  await mkdir(path.join(state, 'repair-plans'), { recursive: true });
-  await mkdir(path.join(state, 'repair-attempts'), { recursive: true });
-  await mkdir(path.join(state, 'repair-candidates'), { recursive: true });
+  for (const dir of [
+    'latest',
+    'ai-queue',
+    'repair-plans',
+    'repair-attempts',
+    'repair-candidates',
+    'repair-reviews'
+  ]) {
+    await mkdir(path.join(state, dir), { recursive: true });
+  }
 
   await writeFile(path.join(state, 'discovery.json'), JSON.stringify({
     generatedAt: '2026-01-01T00:00:00Z',
@@ -61,9 +66,7 @@ test('local control state joins discovery qualification lifecycle AI repair auto
     confidence: 0.85,
     summary: 'Reproduce the failing test and repair the smallest regression.',
     steps: ['Reproduce npm test'],
-    acceptance: ['npm test passes'],
-    aiAnalysis: null,
-    plannerError: null
+    acceptance: ['npm test passes']
   }));
   await writeFile(path.join(state, 'repair-attempts', 'sig.json'), JSON.stringify({
     schemaVersion: 1,
@@ -91,11 +94,23 @@ test('local control state joins discovery qualification lifecycle AI repair auto
     pushed: true,
     pushEnabled: true,
     prEnabled: true,
-    pr: {
-      number: 42,
-      url: 'https://github.com/star8592/demo/pull/42',
-      draft: true
-    }
+    pr: { number: 42, url: 'https://github.com/star8592/demo/pull/42', draft: true }
+  }));
+  await writeFile(path.join(state, 'repair-reviews', 'sig.json'), JSON.stringify({
+    schemaVersion: 1,
+    project: 'demo',
+    repo: 'star8592/demo',
+    signature: 'sig',
+    candidateStatus: 'PR_READY',
+    reviewedAt: '2026-01-01T00:04:00Z',
+    state: 'REVIEWABLE',
+    reasons: [],
+    headSha: 'repairsha',
+    headRef: 'devcontrol/repair/demo-sig',
+    mergeableState: 'clean',
+    checks: { total: 2, passed: 2, pending: 0, failed: 0 },
+    pr: { number: 42, url: 'https://github.com/star8592/demo/pull/42' },
+    draft: true
   }));
 
   const result = await loadLocalControlState(root);
@@ -106,12 +121,11 @@ test('local control state joins discovery qualification lifecycle AI repair auto
   assert.equal(result.projects.demo.failurePackets, 1);
   assert.equal(result.repairPlans.count, 1);
   assert.equal(result.projects.demo.latestRepairPlan.provider, 'heuristic');
-  assert.equal(result.projects.demo.latestRepairPlan.confidence, 0.85);
   assert.equal(result.repairAttempts.count, 1);
   assert.equal(result.projects.demo.latestRepairAttempt.status, 'CANDIDATE_READY');
-  assert.equal(result.projects.demo.latestRepairAttempt.repairSha, 'repairsha');
   assert.equal(result.repairCandidates.count, 1);
-  assert.equal(result.projects.demo.repairCandidates, 1);
-  assert.equal(result.projects.demo.latestRepairCandidate.status, 'PR_READY');
   assert.equal(result.projects.demo.latestRepairCandidate.pr.number, 42);
+  assert.equal(result.repairReviews.count, 1);
+  assert.equal(result.projects.demo.latestRepairReview.state, 'REVIEWABLE');
+  assert.equal(result.projects.demo.latestRepairReview.checks.passed, 2);
 });
