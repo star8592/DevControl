@@ -11,14 +11,13 @@ function digest(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-async function fixture() {
+async function fixture({ roles = ['gameplay_hero', 'character_close'], origin = 'godot-production' } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'visual-loop-packet-'));
   const contractRoot = path.join(root, 'contract');
   const captureRoot = path.join(root, 'repo');
   await mkdir(path.join(contractRoot, 'targets'), { recursive: true });
   await mkdir(path.join(captureRoot, 'captures'), { recursive: true });
 
-  const roles = ['gameplay_hero', 'character_close'];
   const targets = {};
   const captures = [];
   for (const role of roles) {
@@ -43,9 +42,11 @@ async function fixture() {
       width: 1920,
       height: 1080,
       resolution_ok: true,
-      origin: 'godot-production',
+      origin,
       fallback_capture: false,
       editor_preview: false,
+      blender_preview: false,
+      fast_scaffold: false,
       generated_target_presented_as_production: false,
     });
   }
@@ -97,6 +98,55 @@ test('judge packet binds verified target and current capture bytes', async () =>
     assert.deepEqual(Object.keys(packet.views), ['gameplay_hero', 'character_close']);
     assert.equal(packet.views.character_close.current.origin, 'godot-production');
     assert.match(packet.instruction, /independent VisualLoop production-art judge/);
+    assert.equal(packet.judgePolicy.passScore, 8.5);
+  } finally {
+    await rm(data.root, { recursive: true, force: true });
+  }
+});
+
+test('judge packet accepts DanDao authored-room origin and project-specific dimensions', async () => {
+  const roles = ['gameplay_hero', 'furnace_close', 'fire_control_close', 'alternate_left', 'result_right'];
+  const data = await fixture({ roles, origin: 'godot-production-authored-room' });
+  const weights = {
+    composition: 0.18,
+    scale: 0.08,
+    furnace: 0.22,
+    controls: 0.14,
+    materials: 0.16,
+    lighting: 0.10,
+    detail: 0.08,
+    feedback: 0.04,
+  };
+  try {
+    const packet = await buildJudgePacket({
+      contract: data.contract,
+      manifest: data.manifest,
+      targetRoot: data.contractRoot,
+      captureRoot: data.captureRoot,
+      weights,
+    });
+    assert.equal(packet.views.furnace_close.current.origin, 'godot-production-authored-room');
+    assert.deepEqual(packet.judgePolicy.weights, weights);
+    assert.match(packet.instruction, /furnace/);
+    assert.match(packet.instruction, /controls/);
+    assert.doesNotMatch(packet.instruction, /character=/);
+  } finally {
+    await rm(data.root, { recursive: true, force: true });
+  }
+});
+
+test('judge packet rejects non-production origin variants', async () => {
+  const data = await fixture({ origin: 'blender-production' });
+  try {
+    await assert.rejects(
+      buildJudgePacket({
+        contract: data.contract,
+        manifest: data.manifest,
+        targetRoot: data.contractRoot,
+        captureRoot: data.captureRoot,
+      }),
+      /not an allowed Godot production origin/,
+    );
   } finally {
     await rm(data.root, { recursive: true, force: true });
   }
