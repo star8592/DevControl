@@ -11,6 +11,8 @@ DISCOVERY_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-discovery.service"
 DISCOVERY_TIMER_FILE="$SYSTEMD_DIR/devcontrol-discovery.timer"
 QUALIFY_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-qualify.service"
 QUALIFY_TIMER_FILE="$SYSTEMD_DIR/devcontrol-qualify.timer"
+REPORT_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-failure-report.service"
+REPORT_TIMER_FILE="$SYSTEMD_DIR/devcontrol-failure-report.timer"
 LOCAL_BIN="${HOME}/.local/bin"
 OWNER="${DEVCONTROL_OWNER:-star8592}"
 HOST_VALUE="${HOST:-127.0.0.1}"
@@ -20,6 +22,8 @@ DISCOVERY_MAX_DEPTH="${DEVCONTROL_DISCOVERY_MAX_DEPTH:-3}"
 DISCOVERY_INTERVAL="${DEVCONTROL_DISCOVERY_INTERVAL_SEC:-60}"
 QUALIFY_INTERVAL="${DEVCONTROL_QUALIFY_INTERVAL_SEC:-120}"
 QUALIFY_TIMEOUT="${DEVCONTROL_QUALIFY_TIMEOUT_MS:-900000}"
+REPORT_INTERVAL="${DEVCONTROL_FAILURE_REPORT_INTERVAL_SEC:-120}"
+GITHUB_FAILURE_ISSUES="${DEVCONTROL_GITHUB_FAILURE_ISSUES:-0}"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: Node.js 20+ is required." >&2
@@ -64,6 +68,7 @@ DEVCONTROL_DISCOVERY_MAX_DEPTH=$DISCOVERY_MAX_DEPTH
 DEVCONTROL_DISCOVERY_FILE=$ROOT/state/discovery.json
 DEVCONTROL_STATE_DIR=$ROOT/state
 DEVCONTROL_QUALIFY_TIMEOUT_MS=$QUALIFY_TIMEOUT
+DEVCONTROL_GITHUB_FAILURE_ISSUES=$GITHUB_FAILURE_ISSUES
 EOF
 chmod 600 "$ENV_FILE"
 
@@ -154,10 +159,41 @@ Unit=devcontrol-qualify.service
 WantedBy=timers.target
 EOF
 
+cat > "$REPORT_SERVICE_FILE" <<EOF
+[Unit]
+Description=DevControl AI failure packet generator and optional GitHub reporter
+After=devcontrol-qualify.service
+ConditionPathExists=$ROOT/state/latest
+
+[Service]
+Type=oneshot
+WorkingDirectory=$ROOT
+EnvironmentFile=$ENV_FILE
+ExecStart=$NODE_BIN $ROOT/scripts/report-failures.mjs
+NoNewPrivileges=true
+PrivateTmp=true
+EOF
+
+cat > "$REPORT_TIMER_FILE" <<EOF
+[Unit]
+Description=Periodically build DevControl AI failure packets
+
+[Timer]
+OnBootSec=40s
+OnUnitActiveSec=${REPORT_INTERVAL}s
+AccuracySec=10s
+Persistent=true
+Unit=devcontrol-failure-report.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
 systemctl --user daemon-reload
 systemctl --user enable --now devcontrol.service
 systemctl --user enable --now devcontrol-discovery.timer
 systemctl --user enable --now devcontrol-qualify.timer
+systemctl --user enable --now devcontrol-failure-report.timer
 systemctl --user start devcontrol-discovery.service
 systemctl --user restart devcontrol.service
 
@@ -167,7 +203,8 @@ for _ in $(seq 1 30); do
     echo "DevControl is running: http://$HOST_VALUE:$PORT_VALUE"
     echo "CLI:       $LOCAL_BIN/devctl"
     echo "Discovery: every ${DISCOVERY_INTERVAL}s"
-    echo "Qualify:   every ${QUALIFY_INTERVAL}s (new QUALIFY + registered MANAGED projects)"
+    echo "Qualify:   every ${QUALIFY_INTERVAL}s"
+    echo "AI report: every ${REPORT_INTERVAL}s; GitHub issues=${GITHUB_FAILURE_ISSUES}"
     echo "State:     $ROOT/state"
     echo "Service:   systemctl --user status devcontrol.service"
     echo "Timers:    systemctl --user list-timers 'devcontrol-*'"
