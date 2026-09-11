@@ -7,6 +7,11 @@ import { loadProjectRegistry } from './lib/project-registry.mjs';
 import { loadIntegrationRegistry } from './lib/integration-registry.mjs';
 import { createAuditLog } from './lib/audit-log.mjs';
 import { createLocalIntegrationBridge } from './lib/local-integration-bridge.mjs';
+import {
+  visualLoopDispatchSpec,
+  visualLoopDispatchEndpoint,
+  rejectVisualLoopOverrides,
+} from './lib/visual-loop/dispatch.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
@@ -210,6 +215,7 @@ async function fetchProject(key, config) {
   const runs = runsData?.workflow_runs || [];
   const localRun = firstMatchingRun(runs, config.localWorkflows, config.localEvents);
   const lightRun = firstMatchingRun(runs, config.lightWorkflows, config.lightEvents);
+  const visualLoopRun = firstMatchingRun(runs, config.visualLoop?.workflowNames || []);
   const latestRun = runs[0] || null;
   const warnings = deriveWarnings(config, localRun, lightRun, runners);
   const state = overallState(localRun, lightRun, dashboardStatus, warnings);
@@ -241,6 +247,12 @@ async function fetchProject(key, config) {
     latestRun: runSummary(latestRun),
     lightRun: runSummary(lightRun),
     localRun: runSummary(localRun),
+    visualLoop: config.visualLoop ? {
+      enabled: config.visualLoop.enabled === true,
+      workflow: config.visualLoop.workflow || null,
+      ref: config.visualLoop.ref || null,
+      run: runSummary(visualLoopRun),
+    } : null,
     runners,
     runnerSummary: { visible: runners.length, online: onlineRunners.length, busy: busyRunners.length },
     computePath: localRun ? 'self-hosted/local acceptance + GitHub control plane' : 'GitHub control plane; local authority not detected in recent runs',
@@ -334,6 +346,27 @@ async function controlProject(body) {
       const result = { ok: true, requestId, action, project: projectKey, runId: Number(runId) };
       await auditControl({ ...baseAudit, runId: Number(runId), outcome: 'success' });
       refreshPortfolio().catch(error => console.error('post-control refresh failed:', error.message));
+      return result;
+    }
+    if (action === 'visual_loop_qualify') {
+      rejectVisualLoopOverrides(body);
+      const spec = visualLoopDispatchSpec(config);
+      const endpoint = visualLoopDispatchEndpoint(config.repo, spec.workflow);
+      await gh(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: spec.ref })
+      });
+      const result = {
+        ok: true,
+        requestId,
+        action,
+        project: projectKey,
+        workflow: spec.workflow,
+        ref: spec.ref,
+      };
+      await auditControl({ ...baseAudit, workflow: spec.workflow, ref: spec.ref, outcome: 'success' });
+      refreshPortfolio().catch(error => console.error('post-visual-loop refresh failed:', error.message));
       return result;
     }
     throw Object.assign(new Error(`Action not allowed: ${action}`), { status: 400 });
@@ -439,7 +472,16 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/audit') return sendJson(res, 200, { records: await audit.recent(url.searchParams.get('limit')) });
     if (req.method === 'GET' && url.pathname === '/api/projects') {
       return sendJson(res, 200, { projects: registry.projects.map(project => ({
-        key: project.key, name: project.name, repo: project.repo, localPath: project.localPath || null, tags: project.tags || []
+        key: project.key,
+        name: project.name,
+        repo: project.repo,
+        localPath: project.localPath || null,
+        tags: project.tags || [],
+        visualLoop: project.visualLoop ? {
+          enabled: project.visualLoop.enabled === true,
+          workflow: project.visualLoop.workflow || null,
+          ref: project.visualLoop.ref || null,
+        } : null,
       })) });
     }
     if (req.method === 'POST' && url.pathname === '/api/integration') return sendJson(res, 200, await executeIntegration(await readBody(req)));
