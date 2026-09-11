@@ -91,6 +91,9 @@ chmod 600 "$ENV_FILE"
 NODE_BIN="$(command -v node)"
 cat > "$LOCAL_BIN/devctl" <<EOF
 #!/usr/bin/env bash
+set -a
+[ ! -f "$ENV_FILE" ] || . "$ENV_FILE"
+set +a
 exec "$NODE_BIN" "$ROOT/scripts/devctl.mjs" "\$@"
 EOF
 chmod 755 "$LOCAL_BIN/devctl"
