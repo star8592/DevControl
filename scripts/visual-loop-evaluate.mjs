@@ -9,6 +9,7 @@ import {
   contractFingerprint,
   verifyVisualContractTargetFiles,
 } from '../lib/visual-loop/contract.mjs';
+import { loadProjectRegistry } from '../lib/project-registry.mjs';
 import { evaluateVisualLoopRound } from '../lib/visual-loop/round.mjs';
 import { loadVisualLoopHistory, historyForStall, recordVisualLoopRound } from '../lib/visual-loop/store.mjs';
 
@@ -20,6 +21,24 @@ function usage() {
   console.error('Usage: node scripts/visual-loop-evaluate.mjs PROJECT_KEY CONTRACT.json MANIFEST.json VERDICT.json [STORE_ROOT] [TARGET_ROOT]');
 }
 
+function registeredJudgeWeights(project) {
+  const weights = project?.visualLoop?.judgeWeights;
+  if (weights == null) return undefined;
+  if (!weights || typeof weights !== 'object' || Array.isArray(weights)) {
+    throw new Error(`VisualLoop evaluator error: ${project.key}.visualLoop.judgeWeights must be an object`);
+  }
+  const active = Object.entries(weights).filter(([, value]) => Number.isFinite(value) && value > 0);
+  if (active.length === 0) {
+    throw new Error(`VisualLoop evaluator error: ${project.key}.visualLoop.judgeWeights has no positive dimensions`);
+  }
+  for (const [dimension, value] of Object.entries(weights)) {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`VisualLoop evaluator error: invalid judge weight ${dimension}=${value}`);
+    }
+  }
+  return weights;
+}
+
 async function main() {
   const [, , projectKey, contractPath, manifestPath, verdictPath, rootArg, targetRootArg] = process.argv;
   if (!projectKey || !contractPath || !manifestPath || !verdictPath) {
@@ -29,6 +48,12 @@ async function main() {
   }
 
   const rootDir = path.resolve(rootArg || path.dirname(fileURLToPath(import.meta.url)), '..');
+  const registry = await loadProjectRegistry(rootDir);
+  const project = registry.byKey[projectKey];
+  if (!project) throw new Error(`VisualLoop evaluator error: unknown registered project: ${projectKey}`);
+  if (project.visualLoop?.enabled !== true) throw new Error(`VisualLoop evaluator error: project is not VisualLoop-enabled: ${projectKey}`);
+  const weights = registeredJudgeWeights(project);
+
   const absoluteContractPath = path.resolve(contractPath);
   const targetRoot = path.resolve(targetRootArg || path.dirname(absoluteContractPath));
   const [rawContract, manifest, verdict] = await Promise.all([
@@ -37,6 +62,9 @@ async function main() {
     json(verdictPath),
   ]);
   const contract = validateVisualContract(rawContract);
+  if (String(contract.project || '').toLowerCase() !== String(project.name || '').toLowerCase()) {
+    throw new Error(`VisualLoop evaluator error: contract project ${contract.project} does not match registry project ${project.name}`);
+  }
   const targetVerification = await verifyVisualContractTargetFiles(rawContract, targetRoot);
   assertRoundMatchesContract(manifest, contract);
 
@@ -54,6 +82,7 @@ async function main() {
     config: {
       passScore: 8.5,
       regressionEpsilon: 0.15,
+      weights,
       stall: {
         recentRounds: 2,
         minBestScoreImprovement: 1.0,
@@ -76,6 +105,8 @@ async function main() {
     contractFingerprint: contractFingerprint(rawContract),
     targetFilesVerified: true,
     verifiedTargetRoles: Object.keys(targetVerification.verifiedTargets),
+    judgeWeightsSource: weights ? 'project-registry' : 'default',
+    activeJudgeDimensions: weights ? Object.keys(weights).filter(key => weights[key] > 0) : null,
     roundId: round.roundId,
     commitSha: round.commitSha,
     score: round.score,
