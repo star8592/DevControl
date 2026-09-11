@@ -11,8 +11,11 @@ Failure Packet
   -> Repair Candidate
   -> push devcontrol/repair/* branch    (separate opt-in)
   -> create Draft PR                    (separate opt-in)
+  -> read-only PR Review Gate
   -> human / external reviewer
   -> merge                              (never performed by DevControl)
+  -> normal main sync + qualification
+  -> known-good                         (only after local qualification PASS)
 ```
 
 ## Default behavior
@@ -58,6 +61,17 @@ DEVCONTROL_AUTO_PUSH_REPAIR_BRANCH=1
 This permits DevControl to push only the already validated `devcontrol/repair/*` branch.
 It does not create or merge a pull request by itself.
 
+Before each push, DevControl re-verifies actual Git state rather than trusting saved JSON:
+
+- repair worktree HEAD equals the recorded repair SHA;
+- repair branch matches the `devcontrol/repair/*` namespace;
+- worktree is clean;
+- `origin` resolves to the expected GitHub repository;
+- repair SHA descends from the recorded failed SHA;
+- exactly one repair commit exists between failed and repair SHA;
+- committed diff paths exactly match the previously validated changed-path set;
+- the committed diff is rechecked against the high-risk path denylist.
+
 ## Draft PR creation
 
 Draft PR creation requires branch push to be enabled as well:
@@ -84,19 +98,44 @@ A generated Draft PR contains:
 Failure log excerpts are intentionally omitted from the PR body even though executor logs are
 already redacted. This minimizes accidental disclosure of project details.
 
+## Read-only PR Review Gate
+
+Every recorded repair Draft PR is re-read from GitHub by `devctl repair-review`. The gate has
+no approve, ready-for-review, merge, close, or branch-update capability.
+
+The review states are:
+
+- `AWAITING_CI`: no GitHub checks are visible yet or at least one check is still pending;
+- `CI_FAILED`: at least one GitHub check/status failed, timed out, was cancelled, or needs action;
+- `REVIEWABLE`: PR head SHA and branch still match the validated repair candidate and every
+  observed GitHub check/status is passing;
+- `STALE`: repair SHA/branch drifted, the PR branch is behind the base branch, or it conflicts;
+- `CLOSED`: PR was closed without merge;
+- `MERGED`: GitHub reports the PR as merged;
+- `ERROR`: the read-only GitHub inspection itself failed.
+
+`REVIEWABLE` is deliberately not an authorization to merge. It means the repair is ready for a
+human or external reviewing agent to inspect.
+
+A `MERGED` repair is also not immediately trusted. The next normal reconcile cycle must sync the
+updated main branch and run the normal local qualification. Only that normal PASS may advance
+the project's `knownGoodSha`.
+
 ## State
 
-Repair publication state is written under:
+Repair state is written under:
 
 ```text
 state/
 ├── ai-queue/             failure packets
 ├── repair-plans/         PLAN_ONLY repair plans
 ├── repair-attempts/      isolated AutoFix results
-└── repair-candidates/    pushed branch / Draft PR records
+├── repair-candidates/    pushed branch / Draft PR records
+└── repair-reviews/       read-only Draft PR / GitHub CI classifications
 ```
 
-`Autonomy Dashboard` displays the latest repair attempt and repair candidate for every project.
+`Autonomy Dashboard` displays the latest repair attempt, candidate, PR URL and review state for
+every project.
 
 ## Commands
 
@@ -105,11 +144,13 @@ devctl failures
 devctl repairs
 devctl auto-fix
 devctl repair-publish
+devctl repair-review
 devctl local
 ```
 
-`devctl reconcile` runs the complete serialized loop and calls `repair-publish` near the end.
-When the external-write environment switches are off, the publication phase is a no-op.
+`devctl reconcile` runs the complete serialized loop. When external-write switches are off,
+AutoFix publication is a no-op, while the rest of the discovery/qualification/analysis loop
+continues normally.
 
 ## Non-goals
 
@@ -124,4 +165,5 @@ DevControl does not automatically:
 - execute production writes or financial/trading actions.
 
 Those boundaries are intentional. A repair can be fully automated up to a validated Draft PR
-without granting the control plane authority to ship the change to production.
+and read-only review status without granting the control plane authority to ship the change to
+production.
