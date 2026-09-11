@@ -6,13 +6,14 @@ import test from 'node:test';
 
 import { loadLocalControlState } from '../lib/local-state.mjs';
 
-test('local control state joins discovery qualification lifecycle AI repair and auto-fix state', async () => {
+test('local control state joins discovery qualification lifecycle AI repair auto-fix and PR candidate state', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'devcontrol-state-'));
   const state = path.join(root, 'state');
   await mkdir(path.join(state, 'latest'), { recursive: true });
   await mkdir(path.join(state, 'ai-queue'), { recursive: true });
   await mkdir(path.join(state, 'repair-plans'), { recursive: true });
   await mkdir(path.join(state, 'repair-attempts'), { recursive: true });
+  await mkdir(path.join(state, 'repair-candidates'), { recursive: true });
 
   await writeFile(path.join(state, 'discovery.json'), JSON.stringify({
     generatedAt: '2026-01-01T00:00:00Z',
@@ -76,7 +77,25 @@ test('local control state joins discovery qualification lifecycle AI repair and 
     worktree: '/tmp/worktree',
     repairSha: 'repairsha',
     changedPaths: ['src/app.js'],
-    pushed: false
+    pushed: true
+  }));
+  await writeFile(path.join(state, 'repair-candidates', 'sig.json'), JSON.stringify({
+    schemaVersion: 1,
+    project: 'demo',
+    repo: 'star8592/demo',
+    signature: 'sig',
+    recordedAt: '2026-01-01T00:03:00Z',
+    status: 'PR_READY',
+    branch: 'devcontrol/repair/demo-sig',
+    repairSha: 'repairsha',
+    pushed: true,
+    pushEnabled: true,
+    prEnabled: true,
+    pr: {
+      number: 42,
+      url: 'https://github.com/star8592/demo/pull/42',
+      draft: true
+    }
   }));
 
   const result = await loadLocalControlState(root);
@@ -91,4 +110,8 @@ test('local control state joins discovery qualification lifecycle AI repair and 
   assert.equal(result.repairAttempts.count, 1);
   assert.equal(result.projects.demo.latestRepairAttempt.status, 'CANDIDATE_READY');
   assert.equal(result.projects.demo.latestRepairAttempt.repairSha, 'repairsha');
+  assert.equal(result.repairCandidates.count, 1);
+  assert.equal(result.projects.demo.repairCandidates, 1);
+  assert.equal(result.projects.demo.latestRepairCandidate.status, 'PR_READY');
+  assert.equal(result.projects.demo.latestRepairCandidate.pr.number, 42);
 });
