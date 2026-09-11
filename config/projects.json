@@ -6,7 +6,7 @@
       "repo": "star8592/DaoLife",
       "dashboardIssue": 4,
       "phase": "V0.3 Relationship Phase 2",
-      "nextAction": "Friend/Rival causal relationship slice",
+      "nextAction": "Complete rear_or_side role target, materialize all five approved target files, freeze the contract, then independently judge latest production run #7",
       "lightWorkflows": ["DaoLife Light CI"],
       "localWorkflows": ["DaoLife Local Lab"],
       "safety": "No secret exposure; heavy experiments only on self-hosted runner.",
@@ -14,6 +14,7 @@
       "tags": ["game", "rust", "simulation"],
       "visualLoop": {
         "enabled": true,
+        "status": "production-evidence-ready-target-set-draft-rear-role-blocked",
         "workflow": "visual-loop-production.yml",
         "workflowNames": ["DaoLife VisualLoop Qualification"],
         "ref": "feat/visual-loop-capture"
@@ -24,7 +25,7 @@
       "name": "DanDao",
       "repo": "star8592/DanDao",
       "phase": "V0.0.2 Ancient Fire Control",
-      "nextAction": "Run five canonical Godot production views, resolve the exact approved furnace binary, then freeze byte-verified role targets and judge",
+      "nextAction": "Run the hardened five-view canonical Godot capture once, inspect all artifacts, resolve the approved furnace binary mismatch, materialize role-specific ancient-fire targets, freeze, then judge",
       "lightWorkflows": [],
       "localWorkflows": ["DanDao VisualLoop Qualification"],
       "safety": "Godot 4.7.2 Forward+ canonical authored-scene evidence only; no Blender/editor/FAST/fallback image may qualify final art.",
@@ -32,7 +33,7 @@
       "tags": ["game", "godot", "alchemy", "visual-loop"],
       "visualLoop": {
         "enabled": true,
-        "status": "production-capture-ready-target-contract-draft",
+        "status": "capture-pipeline-hardened-target-set-draft-not-yet-run",
         "workflow": "visual-loop-production.yml",
         "workflowNames": ["DanDao VisualLoop Qualification"],
         "ref": "feat/visual-loop-v002-current"
@@ -45,7 +46,7 @@
       "dashboardIssue": 26,
       "phase": "Production Shadow",
       "nextAction": "Continue read-only shadow; stop before Micro-Live",
-      "lightWorkflows": ["BISRE Local PR Gate", "Local PR Gate"],
+      "lightWorkflows": [],
       "localWorkflows": ["BISRE Main Production Shadow", "Main Production Shadow"],
       "safety": "Never alter frozen data or enable real-capital trading.",
       "localPath": "/mnt/disk1/Code/bisre-full/bisre",
