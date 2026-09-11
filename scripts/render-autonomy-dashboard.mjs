@@ -15,5 +15,8 @@ console.log(JSON.stringify({
   ok: true,
   target,
   projects: state.counts.total,
-  failurePackets: state.failureQueue.count
+  failurePackets: state.failureQueue.count,
+  repairPlans: state.repairPlans.count,
+  repairAttempts: state.repairAttempts.count,
+  repairCandidates: state.repairCandidates.count
 }, null, 2));
