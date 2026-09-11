@@ -6,12 +6,48 @@
       "repo": "star8592/DaoLife",
       "dashboardIssue": 4,
       "phase": "V0.3 Relationship Phase 2",
-      "nextAction": "Friend/Rival causal relationship slice",
+      "nextAction": "Complete rear_or_side role target, materialize all five approved target files, freeze the contract, then independently judge latest production run #7",
       "lightWorkflows": ["DaoLife Light CI"],
       "localWorkflows": ["DaoLife Local Lab"],
       "safety": "No secret exposure; heavy experiments only on self-hosted runner.",
       "localPath": "/mnt/disk1/Code/DaoLife",
-      "tags": ["game", "rust", "simulation"]
+      "tags": ["game", "rust", "simulation"],
+      "visualLoop": {
+        "enabled": true,
+        "status": "production-evidence-ready-target-set-draft-rear-role-blocked",
+        "workflow": "visual-loop-production.yml",
+        "workflowNames": ["DaoLife VisualLoop Qualification"],
+        "ref": "feat/visual-loop-capture"
+      }
+    },
+    {
+      "key": "dandao",
+      "name": "DanDao",
+      "repo": "star8592/DanDao",
+      "phase": "V0.0.2 Ancient Fire Control",
+      "nextAction": "Bring the authoritative RTX 5070 Ti self-hosted runner online for queued VisualLoop run #34601413432, inspect all five production artifacts, then resolve the approved furnace binary mismatch and freeze role-specific targets",
+      "lightWorkflows": [],
+      "localWorkflows": ["DanDao VisualLoop Qualification"],
+      "safety": "Godot 4.7.2 Forward+ canonical authored-scene evidence only; no Blender/editor/FAST/fallback image may qualify final art.",
+      "localPath": "/mnt/disk1/Code/DanDao",
+      "tags": ["game", "godot", "alchemy", "visual-loop"],
+      "visualLoop": {
+        "enabled": true,
+        "status": "hardened-pilot-queued-authoritative-runner-offline-target-set-draft",
+        "workflow": "visual-loop-production.yml",
+        "workflowNames": ["DanDao VisualLoop Qualification"],
+        "ref": "feat/visual-loop-v002-current",
+        "judgeWeights": {
+          "composition": 0.18,
+          "scale": 0.08,
+          "furnace": 0.22,
+          "controls": 0.14,
+          "materials": 0.16,
+          "lighting": 0.10,
+          "detail": 0.08,
+          "feedback": 0.04
+        }
+      }
     },
     {
       "key": "bisre",
