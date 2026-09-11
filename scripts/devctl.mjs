@@ -3,8 +3,12 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { clearQuarantine } from '../lib/project-lifecycle.mjs';
+import { loadLocalControlState } from '../lib/local-state.mjs';
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const baseDir = path.resolve(here, '..');
+const stateDir = path.resolve(baseDir, process.env.DEVCONTROL_STATE_DIR || 'state');
 
 function run(script, args = []) {
   const result = spawnSync(process.execPath, [path.resolve(baseDir, script), ...args], {
@@ -18,7 +22,9 @@ function run(script, args = []) {
 const [command = 'status', ...args] = process.argv.slice(2);
 
 if (command === 'discover') run('scripts/discover-projects.mjs', args);
+if (command === 'sync') run('scripts/sync-projects.mjs', args);
 if (command === 'qualify') run('scripts/qualify-projects.mjs', args);
+if (command === 'reconcile') run('scripts/reconcile.mjs', args);
 if (command === 'failures') run('scripts/report-failures.mjs', args);
 if (command === 'check') {
   const result = spawnSync('npm', ['run', 'check'], {
@@ -27,6 +33,22 @@ if (command === 'check') {
     env: process.env
   });
   process.exit(result.status ?? 1);
+}
+
+if (command === 'local') {
+  console.log(JSON.stringify(await loadLocalControlState(baseDir), null, 2));
+  process.exit(0);
+}
+
+if (command === 'quarantine-clear') {
+  const project = args[0];
+  if (!project) {
+    console.error('Usage: devctl quarantine-clear <project>');
+    process.exit(2);
+  }
+  const cleared = await clearQuarantine(stateDir, project);
+  console.log(JSON.stringify({ ok: cleared, project }, null, 2));
+  process.exit(cleared ? 0 : 1);
 }
 
 if (command === 'status') {
@@ -42,5 +64,7 @@ if (command === 'status') {
 }
 
 console.error(`Unknown command: ${command}`);
-console.error('Commands: discover, qualify, failures, status, check');
+console.error(
+  'Commands: discover, sync, qualify, reconcile, failures, local, quarantine-clear, status, check'
+);
 process.exit(2);
