@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "artifactRoot": ".devcontrol/visual-loop",
+  "judge": {
+    "passScore": 8.5,
+    "regressionEpsilon": 0.15,
+    "stall": {
+      "recentRounds": 2,
+      "minBestScoreImprovement": 1.0,
+      "repeatedBlockerRounds": 2
+    },
+    "weights": {
+      "composition": 0.22,
+      "scale": 0.13,
+      "character": 0.15,
+      "architecture": 0.15,
+      "materials": 0.12,
+      "lighting": 0.10,
+      "detail": 0.08,
+      "motion": 0.05
+    }
+  },
+  "profiles": {
+    "godot-production": {
+      "engine": "Godot",
+      "engineVersion": "4.7.2",
+      "renderer": "Vulkan Forward+",
+      "resolution": [1920, 1080],
+      "captureRoles": [
+        "gameplay_hero",
+        "character_close",
+        "architecture_close",
+        "alternate_45",
+        "rear_or_side"
+      ],
+      "performance": {
+        "minAverageFps": 60,
+        "minOnePercentLowFps": 45,
+        "maxVramMiB": null
+      },
+      "evidence": {
+        "requireCommitSha": true,
+        "requireRunnerIdentity": true,
+        "requireEngineVersion": true,
+        "requireRenderer": true,
+        "rejectFallbackCaptures": true,
+        "rejectEditorPreviewAsProduction": true,
+        "rejectGeneratedTargetAsProduction": true
+      }
+    }
+  },
+  "projects": {
+    "daolife": {
+      "profile": "godot-production",
+      "repo": "star8592/DaoLife",
+      "localPath": "/mnt/disk1/Code/DaoLife",
+      "contractPath": ".devcontrol/visual-loop/contract.json",
+      "priorityCaptureRoles": [
+        "gameplay_hero",
+        "character_close"
+      ]
+    },
+    "dandao": {
+      "profile": "godot-production",
+      "repo": "star8592/DanDao",
+      "localPath": "/mnt/disk1/Code/DanDao",
+      "contractPath": ".devcontrol/visual-loop/contract.json"
+    },
+    "tidebound": {
+      "profile": "godot-production",
+      "repo": "star8592/tidebound",
+      "localPath": "/mnt/disk1/Code/tidebound",
+      "contractPath": ".devcontrol/visual-loop/contract.json"
+    }
+  }
+}
