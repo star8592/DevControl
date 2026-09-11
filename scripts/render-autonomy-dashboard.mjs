@@ -20,5 +20,7 @@ console.log(JSON.stringify({
   repairAttempts: state.repairAttempts.count,
   repairCandidates: state.repairCandidates.count,
   repairReviews: state.repairReviews.count,
-  reviewable: state.repairReviews.items.filter(item => item.state === 'REVIEWABLE').length
+  repairCleanups: state.repairCleanups.count,
+  reviewable: state.repairReviews.items.filter(item => item.state === 'REVIEWABLE').length,
+  cleaned: state.repairCleanups.items.filter(item => item.status === 'CLEANED').length
 }, null, 2));
