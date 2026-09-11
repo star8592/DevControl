@@ -7,22 +7,17 @@ SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 ENV_FILE="$CONFIG_DIR/env"
 INTEGRATIONS_FILE="$CONFIG_DIR/integrations.json"
 SERVICE_FILE="$SYSTEMD_DIR/devcontrol.service"
-DISCOVERY_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-discovery.service"
-DISCOVERY_TIMER_FILE="$SYSTEMD_DIR/devcontrol-discovery.timer"
-QUALIFY_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-qualify.service"
-QUALIFY_TIMER_FILE="$SYSTEMD_DIR/devcontrol-qualify.timer"
-REPORT_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-failure-report.service"
-REPORT_TIMER_FILE="$SYSTEMD_DIR/devcontrol-failure-report.timer"
+RECONCILE_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-reconcile.service"
+RECONCILE_TIMER_FILE="$SYSTEMD_DIR/devcontrol-reconcile.timer"
 LOCAL_BIN="${HOME}/.local/bin"
+
 OWNER="${DEVCONTROL_OWNER:-star8592}"
 HOST_VALUE="${HOST:-127.0.0.1}"
 PORT_VALUE="${PORT:-8787}"
 DISCOVERY_ROOTS="${DEVCONTROL_DISCOVERY_ROOTS:-/mnt/disk1/Code:/mnt/disk2}"
 DISCOVERY_MAX_DEPTH="${DEVCONTROL_DISCOVERY_MAX_DEPTH:-3}"
-DISCOVERY_INTERVAL="${DEVCONTROL_DISCOVERY_INTERVAL_SEC:-60}"
-QUALIFY_INTERVAL="${DEVCONTROL_QUALIFY_INTERVAL_SEC:-120}"
+RECONCILE_INTERVAL="${DEVCONTROL_RECONCILE_INTERVAL_SEC:-60}"
 QUALIFY_TIMEOUT="${DEVCONTROL_QUALIFY_TIMEOUT_MS:-900000}"
-REPORT_INTERVAL="${DEVCONTROL_FAILURE_REPORT_INTERVAL_SEC:-120}"
 GITHUB_FAILURE_ISSUES="${DEVCONTROL_GITHUB_FAILURE_ISSUES:-0}"
 
 if ! command -v node >/dev/null 2>&1; then
@@ -99,115 +94,59 @@ PrivateTmp=true
 WantedBy=default.target
 EOF
 
-cat > "$DISCOVERY_SERVICE_FILE" <<EOF
+cat > "$RECONCILE_SERVICE_FILE" <<EOF
 [Unit]
-Description=DevControl automatic multi-repository discovery
+Description=DevControl autonomous multi-project reconcile loop
 After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
 WorkingDirectory=$ROOT
 EnvironmentFile=$ENV_FILE
-ExecStart=$NODE_BIN $ROOT/scripts/discover-projects.mjs
-NoNewPrivileges=true
-PrivateTmp=true
-EOF
-
-cat > "$DISCOVERY_TIMER_FILE" <<EOF
-[Unit]
-Description=Periodically discover and classify local development projects
-
-[Timer]
-OnBootSec=10s
-OnUnitActiveSec=${DISCOVERY_INTERVAL}s
-AccuracySec=5s
-Persistent=true
-Unit=devcontrol-discovery.service
-
-[Install]
-WantedBy=timers.target
-EOF
-
-cat > "$QUALIFY_SERVICE_FILE" <<EOF
-[Unit]
-Description=DevControl safe automatic project qualification
-After=devcontrol-discovery.service
-ConditionPathExists=$ROOT/state/discovery.json
-
-[Service]
-Type=oneshot
-WorkingDirectory=$ROOT
-EnvironmentFile=$ENV_FILE
-ExecStart=$NODE_BIN $ROOT/scripts/qualify-projects.mjs --managed
+ExecStart=$NODE_BIN $ROOT/scripts/reconcile.mjs
 NoNewPrivileges=true
 PrivateTmp=true
 Nice=5
 EOF
 
-cat > "$QUALIFY_TIMER_FILE" <<EOF
+cat > "$RECONCILE_TIMER_FILE" <<EOF
 [Unit]
-Description=Periodically qualify eligible DevControl projects
+Description=Periodically reconcile all DevControl projects
 
 [Timer]
-OnBootSec=25s
-OnUnitActiveSec=${QUALIFY_INTERVAL}s
-AccuracySec=10s
+OnBootSec=10s
+OnUnitActiveSec=${RECONCILE_INTERVAL}s
+AccuracySec=5s
 Persistent=true
-Unit=devcontrol-qualify.service
+Unit=devcontrol-reconcile.service
 
 [Install]
 WantedBy=timers.target
 EOF
 
-cat > "$REPORT_SERVICE_FILE" <<EOF
-[Unit]
-Description=DevControl AI failure packet generator and optional GitHub reporter
-After=devcontrol-qualify.service
-ConditionPathExists=$ROOT/state/latest
-
-[Service]
-Type=oneshot
-WorkingDirectory=$ROOT
-EnvironmentFile=$ENV_FILE
-ExecStart=$NODE_BIN $ROOT/scripts/report-failures.mjs
-NoNewPrivileges=true
-PrivateTmp=true
-EOF
-
-cat > "$REPORT_TIMER_FILE" <<EOF
-[Unit]
-Description=Periodically build DevControl AI failure packets
-
-[Timer]
-OnBootSec=40s
-OnUnitActiveSec=${REPORT_INTERVAL}s
-AccuracySec=10s
-Persistent=true
-Unit=devcontrol-failure-report.service
-
-[Install]
-WantedBy=timers.target
-EOF
+# V0.6 replaces the three independent timers with one serialized reconcile loop.
+systemctl --user disable --now \
+  devcontrol-discovery.timer \
+  devcontrol-qualify.timer \
+  devcontrol-failure-report.timer >/dev/null 2>&1 || true
 
 systemctl --user daemon-reload
 systemctl --user enable --now devcontrol.service
-systemctl --user enable --now devcontrol-discovery.timer
-systemctl --user enable --now devcontrol-qualify.timer
-systemctl --user enable --now devcontrol-failure-report.timer
-systemctl --user start devcontrol-discovery.service
+systemctl --user enable --now devcontrol-reconcile.timer
+systemctl --user start devcontrol-reconcile.service
 systemctl --user restart devcontrol.service
 
 URL="http://$HOST_VALUE:$PORT_VALUE/api/health"
 for _ in $(seq 1 30); do
   if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; then
     echo "DevControl is running: http://$HOST_VALUE:$PORT_VALUE"
-    echo "CLI:       $LOCAL_BIN/devctl"
-    echo "Discovery: every ${DISCOVERY_INTERVAL}s"
-    echo "Qualify:   every ${QUALIFY_INTERVAL}s"
-    echo "AI report: every ${REPORT_INTERVAL}s; GitHub issues=${GITHUB_FAILURE_ISSUES}"
-    echo "State:     $ROOT/state"
-    echo "Service:   systemctl --user status devcontrol.service"
-    echo "Timers:    systemctl --user list-timers 'devcontrol-*'"
+    echo "Autonomy:   http://$HOST_VALUE:$PORT_VALUE/autonomy.html"
+    echo "CLI:        $LOCAL_BIN/devctl"
+    echo "Reconcile:  every ${RECONCILE_INTERVAL}s"
+    echo "State:      $ROOT/state"
+    echo "Service:    systemctl --user status devcontrol.service"
+    echo "Timer:      systemctl --user status devcontrol-reconcile.timer"
     exit 0
   fi
   sleep 0.25
