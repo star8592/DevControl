@@ -24,6 +24,7 @@ const qualify = run('scripts/qualify-projects.mjs', ['--managed'], { allowFailur
 run('scripts/report-failures.mjs', [], { allowFailure: true });
 run('scripts/plan-repairs.mjs', [], { allowFailure: true });
 run('scripts/auto-fix.mjs', [], { allowFailure: true });
+run('scripts/publish-repairs.mjs', [], { allowFailure: true });
 run('scripts/render-autonomy-dashboard.mjs', [], { allowFailure: true });
 
 if (qualify !== 0) {
