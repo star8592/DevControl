@@ -47,3 +47,30 @@ test('discoverProjects detects a new Python git repository and safe checks', asy
     report.projects[0].proposedQualify.some(item => item.command === 'python -m pytest -q')
   );
 });
+
+test('discoverProjects detects a nested Godot root without treating it as another git project', async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'devcontrol-godot-discovery-'));
+  const repo = path.join(temp, 'HybridGame');
+  await mkdir(path.join(repo, 'game'), { recursive: true });
+  await writeFile(path.join(repo, 'Cargo.toml'), '[package]\nname="hybrid"\nversion="0.1.0"\n');
+  await writeFile(path.join(repo, 'game', 'project.godot'), '[application]\nconfig/name="Hybrid"\n');
+  execFileSync('git', ['init', '-q', repo]);
+  execFileSync(
+    'git',
+    ['-C', repo, 'remote', 'add', 'origin', 'git@github.com:star8592/HybridGame.git']
+  );
+
+  const report = await discoverProjects({
+    roots: [temp],
+    maxDepth: 2,
+    configuredProjects: []
+  });
+
+  assert.equal(report.counts.total, 1);
+  assert.equal(report.projects[0].stacks.includes('godot'), true);
+  assert.equal(report.projects[0].stacks.includes('rust'), true);
+  assert.deepEqual(report.projects[0].godotProjectPaths, ['game']);
+  assert.ok(
+    report.projects[0].proposedQualify.some(item => item.command.includes('--path game'))
+  );
+});
