@@ -25,6 +25,11 @@ if (command === 'discover') run('scripts/discover-projects.mjs', args);
 if (command === 'sync') run('scripts/sync-projects.mjs', args);
 if (command === 'qualify') run('scripts/qualify-projects.mjs', args);
 if (command === 'visual-probe') run('scripts/probe-visual.mjs', args);
+if (command === 'visual-enable') run('scripts/visual-control.mjs', ['enable', ...args]);
+if (command === 'visual-disable') run('scripts/visual-control.mjs', ['disable', ...args]);
+if (command === 'visual-reset') run('scripts/visual-control.mjs', ['reset', ...args]);
+if (command === 'visual-status') run('scripts/visual-control.mjs', ['status', ...args]);
+if (command === 'visual-run') run('scripts/visual-control.mjs', ['run', ...args]);
 if (command === 'reconcile') run('scripts/reconcile.mjs', args);
 if (command === 'failures') run('scripts/report-failures.mjs', args);
 if (command === 'repairs') run('scripts/plan-repairs.mjs', args);
@@ -71,6 +76,6 @@ if (command === 'status') {
 
 console.error(`Unknown command: ${command}`);
 console.error(
-  'Commands: discover, sync, qualify, visual-probe, reconcile, failures, repairs, auto-fix, repair-publish, repair-review, repair-cleanup, local, quarantine-clear, status, check'
+  'Commands: discover, sync, qualify, visual-probe, visual-enable, visual-disable, visual-reset, visual-status, visual-run, reconcile, failures, repairs, auto-fix, repair-publish, repair-review, repair-cleanup, local, quarantine-clear, status, check'
 );
 process.exit(2);
