@@ -163,7 +163,6 @@ systemctl --user disable --now \
 systemctl --user daemon-reload
 systemctl --user enable --now devcontrol.service
 systemctl --user enable --now devcontrol-reconcile.timer
-systemctl --user start devcontrol-reconcile.service
 systemctl --user restart devcontrol.service
 
 URL="http://$HOST_VALUE:$PORT_VALUE/api/health"
@@ -172,13 +171,14 @@ for _ in $(seq 1 30); do
     echo "DevControl is running: http://$HOST_VALUE:$PORT_VALUE"
     echo "Autonomy:   http://$HOST_VALUE:$PORT_VALUE/autonomy.html"
     echo "CLI:        $LOCAL_BIN/devctl"
-    echo "Reconcile:  every ${RECONCILE_INTERVAL}s"
+    echo "Reconcile:  every ${RECONCILE_INTERVAL}s (background timer; installer does not wait for it)"
     echo "Planner:    ${REPAIR_PLANNER} (PLAN_ONLY)"
     echo "Visual:     godot=${GODOT_BIN}; timeout=${VISUAL_TIMEOUT}ms; per-project opt-in"
     echo "AutoFix:    ${AUTO_FIX}; push repair branch=${AUTO_PUSH_REPAIR}; draft PR=${AUTO_CREATE_REPAIR_PR}"
     echo "State:      $ROOT/state"
     echo "Service:    systemctl --user status devcontrol.service"
     echo "Timer:      systemctl --user status devcontrol-reconcile.timer"
+    echo "First discovery/reconcile will be triggered asynchronously by the timer."
     exit 0
   fi
   sleep 0.25
