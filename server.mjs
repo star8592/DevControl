@@ -3,12 +3,17 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+
 import { loadProjectRegistry } from './lib/project-registry.mjs';
 import { loadIntegrationRegistry } from './lib/integration-registry.mjs';
 import { createAuditLog } from './lib/audit-log.mjs';
 import { createLocalIntegrationBridge } from './lib/local-integration-bridge.mjs';
+import { loadLocalControlState } from './lib/local-state.mjs';
+import { createLocalOperationManager } from './lib/local-operation-manager.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PACKAGE = JSON.parse(await readFile(path.resolve(__dirname, 'package.json'), 'utf8'));
+const VERSION = PACKAGE.version || '0.13.0';
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
@@ -27,7 +32,7 @@ function githubHeaders() {
   const headers = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'DevControl/0.3.2'
+    'User-Agent': `DevControl/${VERSION}`
   };
   if (GITHUB_TOKEN) headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
   return headers;
@@ -260,16 +265,23 @@ async function portfolioStatus() {
       nextAction: config.nextAction || null, safety: config.safety || null, warnings: [], fetchedAt: new Date().toISOString()
     };
   });
-  const counts = projects.reduce((acc, project) => { acc[project.state] = (acc[project.state] || 0) + 1; return acc; }, {});
+  const counts = projects.reduce((acc, project) => {
+    acc[project.state] = (acc[project.state] || 0) + 1;
+    return acc;
+  }, {});
   const onlineRunners = projects.reduce((sum, project) => sum + (project.runnerSummary?.online || 0), 0);
   const busyRunners = projects.reduce((sum, project) => sum + (project.runnerSummary?.busy || 0), 0);
   const warningCount = projects.reduce((sum, project) => sum + (project.warnings?.length || 0), 0);
 
   return {
     generatedAt: new Date().toISOString(),
-    version: '0.3.2',
+    version: VERSION,
     registry: { file: registry.filePath, projects: entries.length },
-    integrationRegistry: { file: integrations.filePath, enabled: integrations.integrations.filter(item => item.enabled).length, total: integrations.integrations.length },
+    integrationRegistry: {
+      file: integrations.filePath,
+      enabled: integrations.integrations.filter(item => item.enabled).length,
+      total: integrations.integrations.length
+    },
     stream: { enabled: true, refreshMs: STATUS_REFRESH_MS },
     tokenConfigured: Boolean(GITHUB_TOKEN),
     counts,
@@ -293,6 +305,31 @@ function broadcast(event, data) {
   }
 }
 
+const localOperations = createLocalOperationManager({
+  baseDir: __dirname,
+  projectRegistry: registry,
+  onFinish: async operation => {
+    if (integrations.security.auditEveryWriteAction) {
+      await audit.append({
+        requestId: operation.id,
+        kind: 'local-control',
+        action: operation.action,
+        project: operation.project,
+        outcome: operation.status === 'SUCCESS' ? 'success' : 'tool-failed',
+        exitCode: operation.exitCode
+      });
+    }
+    broadcast('local-operation', {
+      id: operation.id,
+      action: operation.action,
+      project: operation.project,
+      status: operation.status,
+      exitCode: operation.exitCode,
+      finishedAt: operation.finishedAt
+    });
+  }
+});
+
 async function refreshPortfolio() {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = portfolioStatus()
@@ -310,17 +347,27 @@ async function auditControl(record) {
   await audit.append(record);
 }
 
+function rejectArbitraryCommandFields(body) {
+  if (body && ('command' in body || 'shell' in body || 'argv' in body)) {
+    throw Object.assign(new Error('Arbitrary command text is forbidden by policy'), { status: 400 });
+  }
+}
+
 async function controlProject(body) {
   const requestId = randomUUID();
   const projectKey = body?.project;
   const action = body?.action;
   const runId = body?.runId;
-  const baseAudit = { requestId, kind: 'control', project: projectKey || null, action: action || null, runId: runId ?? null };
+  const baseAudit = {
+    requestId,
+    kind: 'control',
+    project: projectKey || null,
+    action: action || null,
+    runId: runId ?? null
+  };
 
   try {
-    if (body && ('command' in body || 'shell' in body || 'argv' in body)) {
-      throw Object.assign(new Error('Arbitrary command text is forbidden by policy'), { status: 400 });
-    }
+    rejectArbitraryCommandFields(body);
     const config = PROJECTS[projectKey];
     if (!config) throw Object.assign(new Error('Unknown project'), { status: 400 });
     if (!GITHUB_TOKEN) throw Object.assign(new Error('GITHUB_TOKEN is required for control actions'), { status: 401 });
@@ -338,7 +385,34 @@ async function controlProject(body) {
     }
     throw Object.assign(new Error(`Action not allowed: ${action}`), { status: 400 });
   } catch (error) {
-    await auditControl({ ...baseAudit, outcome: 'rejected-or-failed', error: String(error.message || error).slice(0, 300) }).catch(() => {});
+    await auditControl({
+      ...baseAudit,
+      outcome: 'rejected-or-failed',
+      error: String(error.message || error).slice(0, 300)
+    }).catch(() => {});
+    throw error;
+  }
+}
+
+async function controlLocal(body) {
+  const requestId = randomUUID();
+  const action = String(body?.action || '');
+  const project = body?.project == null ? null : String(body.project);
+  const force = body?.force === true;
+  const baseAudit = { requestId, kind: 'local-control', action, project, force };
+  try {
+    rejectArbitraryCommandFields(body);
+    await auditControl({ ...baseAudit, outcome: 'requested' });
+    const operation = localOperations.start({ action, project, force });
+    await auditControl({ ...baseAudit, operationId: operation.id, outcome: 'accepted' });
+    broadcast('local-operation', operation);
+    return { ok: true, requestId, operation };
+  } catch (error) {
+    await auditControl({
+      ...baseAudit,
+      outcome: 'rejected-or-failed',
+      error: String(error.message || error).slice(0, 300)
+    }).catch(() => {});
     throw error;
   }
 }
@@ -350,15 +424,17 @@ async function executeIntegration(body) {
   const project = body?.project ? String(body.project) : null;
   const baseAudit = { requestId, kind: 'integration', integration: integration || null, action: action || null, project };
   try {
-    if (body && ('command' in body || 'shell' in body || 'argv' in body)) {
-      throw Object.assign(new Error('Arbitrary command text is forbidden by policy'), { status: 400 });
-    }
+    rejectArbitraryCommandFields(body);
     await audit.append({ ...baseAudit, outcome: 'requested' });
     const result = await bridge.execute(body);
     await audit.append({ ...baseAudit, outcome: result.ok === false ? 'tool-failed' : 'success' });
     return { requestId, ...result };
   } catch (error) {
-    await audit.append({ ...baseAudit, outcome: 'rejected-or-failed', error: String(error.message || error).slice(0, 300) }).catch(() => {});
+    await audit.append({
+      ...baseAudit,
+      outcome: 'rejected-or-failed',
+      error: String(error.message || error).slice(0, 300)
+    }).catch(() => {});
     throw error;
   }
 }
@@ -379,7 +455,10 @@ async function readBody(req) {
 }
 
 function sendJson(res, status, data) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store'
+  });
   res.end(JSON.stringify(data));
 }
 
@@ -388,14 +467,17 @@ async function serveStatic(res, pathname) {
   const publicRoot = path.resolve(__dirname, 'public');
   const filePath = path.resolve(publicRoot, relativePath);
   if (filePath !== publicRoot && !filePath.startsWith(`${publicRoot}${path.sep}`)) {
-    res.writeHead(403); res.end('Forbidden'); return;
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
   }
   try {
     const content = await readFile(filePath);
     res.writeHead(200, { 'Content-Type': contentType(filePath), 'Cache-Control': 'no-cache' });
     res.end(content);
   } catch {
-    res.writeHead(404); res.end('Not Found');
+    res.writeHead(404);
+    res.end('Not Found');
   }
 }
 
@@ -408,13 +490,16 @@ function openEventStream(req, res) {
   });
   res.write('retry: 3000\n\n');
   eventClients.add(res);
-  sendEvent(res, 'hello', { service: 'DevControl', version: '0.3.2', refreshMs: STATUS_REFRESH_MS });
+  sendEvent(res, 'hello', { service: 'DevControl', version: VERSION, refreshMs: STATUS_REFRESH_MS });
   if (cachedPortfolio) sendEvent(res, 'status', cachedPortfolio);
   const heartbeat = setInterval(() => {
     try { res.write(`: heartbeat ${Date.now()}\n\n`); } catch { clearInterval(heartbeat); }
   }, 25000);
   heartbeat.unref?.();
-  req.on('close', () => { clearInterval(heartbeat); eventClients.delete(res); });
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    eventClients.delete(res);
+  });
 }
 
 const server = http.createServer(async (req, res) => {
@@ -424,9 +509,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         ok: true,
         service: 'DevControl',
-        version: '0.3.2',
+        version: VERSION,
         projects: Object.keys(PROJECTS).length,
         integrations: integrations.integrations.length,
+        localActions: localOperations.allowedActions(),
         sseClients: eventClients.size
       });
     }
@@ -434,25 +520,64 @@ const server = http.createServer(async (req, res) => {
       const force = url.searchParams.get('refresh') === '1';
       return sendJson(res, 200, force || !cachedPortfolio ? await refreshPortfolio() : cachedPortfolio);
     }
-    if (req.method === 'GET' && url.pathname === '/api/events') return openEventStream(req, res);
-    if (req.method === 'GET' && url.pathname === '/api/integrations') return sendJson(res, 200, integrations.publicView);
-    if (req.method === 'GET' && url.pathname === '/api/audit') return sendJson(res, 200, { records: await audit.recent(url.searchParams.get('limit')) });
-    if (req.method === 'GET' && url.pathname === '/api/projects') {
-      return sendJson(res, 200, { projects: registry.projects.map(project => ({
-        key: project.key, name: project.name, repo: project.repo, localPath: project.localPath || null, tags: project.tags || []
-      })) });
+    if (req.method === 'GET' && url.pathname === '/api/local-state') {
+      return sendJson(res, 200, await loadLocalControlState(__dirname));
     }
-    if (req.method === 'POST' && url.pathname === '/api/integration') return sendJson(res, 200, await executeIntegration(await readBody(req)));
-    if (req.method === 'POST' && url.pathname === '/api/control') return sendJson(res, 200, await controlProject(await readBody(req)));
+    if (req.method === 'GET' && url.pathname === '/api/local-operations') {
+      return sendJson(res, 200, {
+        allowedActions: localOperations.allowedActions(),
+        operations: localOperations.list()
+      });
+    }
+    if (req.method === 'GET' && url.pathname.startsWith('/api/local-operations/')) {
+      const id = decodeURIComponent(url.pathname.slice('/api/local-operations/'.length));
+      const operation = localOperations.get(id);
+      return operation
+        ? sendJson(res, 200, { operation })
+        : sendJson(res, 404, { ok: false, error: 'Operation not found' });
+    }
+    if (req.method === 'GET' && url.pathname === '/api/events') return openEventStream(req, res);
+    if (req.method === 'GET' && url.pathname === '/api/integrations') {
+      return sendJson(res, 200, integrations.publicView);
+    }
+    if (req.method === 'GET' && url.pathname === '/api/audit') {
+      return sendJson(res, 200, { records: await audit.recent(url.searchParams.get('limit')) });
+    }
+    if (req.method === 'GET' && url.pathname === '/api/projects') {
+      return sendJson(res, 200, {
+        projects: registry.projects.map(project => ({
+          key: project.key,
+          name: project.name,
+          repo: project.repo,
+          localPath: project.localPath || null,
+          tags: project.tags || [],
+          visualQualification: project.visualQualification || null
+        }))
+      });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/integration') {
+      return sendJson(res, 200, await executeIntegration(await readBody(req)));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/control') {
+      return sendJson(res, 200, await controlProject(await readBody(req)));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/local-control') {
+      return sendJson(res, 202, await controlLocal(await readBody(req)));
+    }
     return serveStatic(res, url.pathname);
   } catch (error) {
     const status = Number(error.status) || 500;
-    return sendJson(res, status, { ok: false, error: error.message });
+    return sendJson(res, status, {
+      ok: false,
+      error: error.message,
+      activeOperation: error.activeOperation || undefined
+    });
   }
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`DevControl listening on http://${HOST}:${PORT}`);
+  console.log(`DevControl ${VERSION} listening on http://${HOST}:${PORT}`);
+  console.log(`Control Center: http://${HOST}:${PORT}/control.html`);
   console.log(`Project registry: ${registry.filePath}`);
   console.log(`Integration registry: ${integrations.filePath}`);
   console.log(`Projects loaded: ${Object.keys(PROJECTS).length}`);
