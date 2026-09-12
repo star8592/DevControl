@@ -6,19 +6,11 @@ import {
   buildLocalOperationInvocation
 } from '../lib/local-operation-manager.mjs';
 
-const registry = {
-  byKey: {
-    dandao: { key: 'dandao' },
-    daolife: { key: 'daolife' }
-  }
-};
-
 test('control center maps qualification to fixed managed argv without shell text', () => {
   const value = buildLocalOperationInvocation({
     action: 'qualify',
     project: 'dandao',
-    force: true,
-    projectRegistry: registry
+    force: true
   });
   assert.equal(value.script, 'scripts/qualify-projects.mjs');
   assert.deepEqual(value.args, ['--managed', '--project', 'dandao', '--force']);
@@ -27,20 +19,21 @@ test('control center maps qualification to fixed managed argv without shell text
 test('visual enable uses existing visual-control positional protocol', () => {
   const value = buildLocalOperationInvocation({
     action: 'visual_enable',
-    project: 'dandao',
-    projectRegistry: registry
+    project: 'dandao'
   });
   assert.equal(value.script, 'scripts/visual-control.mjs');
   assert.deepEqual(value.args, ['enable', 'dandao']);
 });
 
-test('unknown projects and project selectors on global actions are rejected', () => {
+test('discovered project keys are allowed but path-like selectors and global project selectors are rejected', () => {
+  const discovered = buildLocalOperationInvocation({ action: 'sync', project: 'new-project' });
+  assert.deepEqual(discovered.args, ['--managed', '--project', 'new-project']);
   assert.throws(
-    () => buildLocalOperationInvocation({ action: 'sync', project: 'unknown', projectRegistry: registry }),
-    /Unknown or invalid project key/
+    () => buildLocalOperationInvocation({ action: 'sync', project: '../../tmp/escape' }),
+    /Invalid project key/
   );
   assert.throws(
-    () => buildLocalOperationInvocation({ action: 'reconcile', project: 'dandao', projectRegistry: registry }),
+    () => buildLocalOperationInvocation({ action: 'reconcile', project: 'dandao' }),
     /does not accept a project selector/
   );
 });
