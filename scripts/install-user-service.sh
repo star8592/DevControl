@@ -6,6 +6,7 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/devcontrol"
 SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 ENV_FILE="$CONFIG_DIR/env"
 INTEGRATIONS_FILE="$CONFIG_DIR/integrations.json"
+PROJECT_OVERRIDES_FILE="$CONFIG_DIR/projects.local.json"
 SERVICE_FILE="$SYSTEMD_DIR/devcontrol.service"
 RECONCILE_SERVICE_FILE="$SYSTEMD_DIR/devcontrol-reconcile.service"
 RECONCILE_TIMER_FILE="$SYSTEMD_DIR/devcontrol-reconcile.timer"
@@ -69,12 +70,26 @@ else
   echo "Keeping existing local integration config: $INTEGRATIONS_FILE"
 fi
 
+if [ ! -f "$PROJECT_OVERRIDES_FILE" ]; then
+  cat > "$PROJECT_OVERRIDES_FILE" <<'EOF'
+{
+  "schemaVersion": 1,
+  "projects": {}
+}
+EOF
+  chmod 600 "$PROJECT_OVERRIDES_FILE"
+  echo "Created local project overrides: $PROJECT_OVERRIDES_FILE"
+else
+  echo "Keeping existing local project overrides: $PROJECT_OVERRIDES_FILE"
+fi
+
 cat > "$ENV_FILE" <<EOF
 GITHUB_TOKEN=$TOKEN
 DEVCONTROL_OWNER=$OWNER
 HOST=$HOST_VALUE
 PORT=$PORT_VALUE
 DEVCONTROL_INTEGRATIONS_FILE=$INTEGRATIONS_FILE
+DEVCONTROL_PROJECT_OVERRIDES_FILE=$PROJECT_OVERRIDES_FILE
 DEVCONTROL_DISCOVERY_ROOTS=$DISCOVERY_ROOTS
 DEVCONTROL_DISCOVERY_MAX_DEPTH=$DISCOVERY_MAX_DEPTH
 DEVCONTROL_DISCOVERY_FILE=$ROOT/state/discovery.json
@@ -174,6 +189,7 @@ for _ in $(seq 1 30); do
     echo "Reconcile:  every ${RECONCILE_INTERVAL}s (background timer; installer does not wait for it)"
     echo "Planner:    ${REPAIR_PLANNER} (PLAN_ONLY)"
     echo "Visual:     godot=${GODOT_BIN}; timeout=${VISUAL_TIMEOUT}ms; per-project opt-in"
+    echo "Overrides:  $PROJECT_OVERRIDES_FILE"
     echo "AutoFix:    ${AUTO_FIX}; push repair branch=${AUTO_PUSH_REPAIR}; draft PR=${AUTO_CREATE_REPAIR_PR}"
     echo "State:      $ROOT/state"
     echo "Service:    systemctl --user status devcontrol.service"
