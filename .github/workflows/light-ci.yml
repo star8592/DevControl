@@ -44,6 +44,26 @@ jobs:
           curl --max-time 45 -fsS http://127.0.0.1:8787/api/status >/tmp/status.json
           node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/status.json','utf8'));const r=JSON.parse(fs.readFileSync('config/projects.json','utf8'));if(!Array.isArray(d.projects)||!Array.isArray(r.projects)||d.projects.length!==r.projects.length)process.exit(1);if(!d.stream?.enabled)process.exit(1);console.log(JSON.stringify({projects:d.projects.length,registryProjects:r.projects.length,counts:d.counts,stream:d.stream}))"
 
+          curl -fsS http://127.0.0.1:8787/control.html >/tmp/control.html
+          grep -q '管理中心' /tmp/control.html
+          curl -fsS http://127.0.0.1:8787/api/local-state >/tmp/local-state.json
+          curl -fsS http://127.0.0.1:8787/api/local-operations >/tmp/local-operations.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/local-operations.json','utf8'));if(!d.allowedActions.includes('qualify')||!d.allowedActions.includes('visual_run'))process.exit(1);if(d.allowedActions.includes('auto_fix')||d.allowedActions.includes('repair_publish')||d.allowedActions.includes('merge'))process.exit(1);console.log(JSON.stringify({localActions:d.allowedActions}))"
+
+          code=$(curl -sS -o /tmp/local-denied.json -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"action":"auto_fix"}' \
+            http://127.0.0.1:8787/api/local-control)
+          test "$code" = "400"
+          grep -q 'Local action not allowed' /tmp/local-denied.json
+
+          code=$(curl -sS -o /tmp/local-command-denied.json -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"action":"qualify","project":"daolife","command":"rm -rf /"}' \
+            http://127.0.0.1:8787/api/local-control)
+          test "$code" = "400"
+          grep -q 'Arbitrary command text is forbidden' /tmp/local-command-denied.json
+
           curl -fsS http://127.0.0.1:8787/api/integrations >/tmp/integrations.json
           node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/integrations.json','utf8'));if(!Array.isArray(d.integrations)||d.integrations.length<2)process.exit(1);if(d.security?.defaultWritePolicy!=='deny')process.exit(1);if(d.integrations.some(x=>x.token||x.authorization))process.exit(1);console.log(JSON.stringify({integrations:d.integrations.length,security:d.security}))"
 
@@ -70,5 +90,5 @@ jobs:
           test "$code" = "400"
           grep -q 'Arbitrary command text is forbidden' /tmp/reject.json
 
-          curl -fsS 'http://127.0.0.1:8787/api/audit?limit=20' >/tmp/audit.json
-          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));if(!Array.isArray(d.records)||!d.records.some(x=>x.kind==='integration')||!d.records.some(x=>x.outcome==='rejected-or-failed'))process.exit(1);if(d.records.some(x=>x.token||x.authorization||x.headers||x.prompt))process.exit(1);console.log(JSON.stringify({auditRecords:d.records.length}))"
+          curl -fsS 'http://127.0.0.1:8787/api/audit?limit=30' >/tmp/audit.json
+          node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));if(!Array.isArray(d.records)||!d.records.some(x=>x.kind==='integration')||!d.records.some(x=>x.kind==='local-control')||!d.records.some(x=>x.outcome==='rejected-or-failed'))process.exit(1);if(d.records.some(x=>x.token||x.authorization||x.headers||x.prompt))process.exit(1);console.log(JSON.stringify({auditRecords:d.records.length}))"
