@@ -17,7 +17,7 @@
 <div class="footer" id="updated"></div>
 </main>
 <script>
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const short=s=>s?String(s).slice(0,10):'—';
 const badge=s=>`<span class="badge ${esc(s||'')}">${esc(s||'—')}</span>`;
 const stat=(v,k)=>`<div class="stat"><b>${esc(v)}</b><span>${esc(k)}</span></div>`;
@@ -32,7 +32,9 @@ async function invoke(action,project=null,force=false){
 }
 function visualButtons(p){
  if(!(p.stacks||[]).includes('godot'))return '';
+ const registered=p.registration?.state==='REGISTERED';
  const enabled=Boolean(p.registration?.visualQualification?.enabled);
+ if(!registered)return `<button class="action" onclick="invoke('visual_probe','${esc(p.key)}')">Probe</button><span class="muted">Visual override 需注册</span>`;
  return `<button class="action" onclick="invoke('visual_probe','${esc(p.key)}')">Probe</button>${enabled?`<button class="action" onclick="invoke('visual_status','${esc(p.key)}')">V.Status</button><button class="action primary" onclick="invoke('visual_run','${esc(p.key)}')">V.Run</button><button class="action danger" onclick="invoke('visual_disable','${esc(p.key)}')">V.Off</button>`:`<button class="action primary" onclick="invoke('visual_enable','${esc(p.key)}')">V.On</button>`}`;
 }
 function projectRow(p){
