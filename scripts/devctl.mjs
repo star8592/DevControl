@@ -120,3 +120,37 @@ if(process.argv[2]==="diagnose"){
  process.exit(0);
 }
 
+
+
+if(process.argv[2]==="local-status"){
+
+ const {localStatus}=await import("../lib/mcp/local-debug-adapter.mjs");
+
+ console.log(
+ JSON.stringify(
+ await localStatus(),
+ null,
+ 2
+ )
+ );
+
+ process.exit(0);
+}
+
+
+if(process.argv[2]==="local-diagnose"){
+
+ const {localDiagnose}=await import("../lib/mcp/local-debug-adapter.mjs");
+
+ console.log(
+ JSON.stringify(
+ await localDiagnose(process.argv[3]||process.cwd()),
+ null,
+ 2
+ )
+ );
+
+ process.exit(0);
+}
+
+
