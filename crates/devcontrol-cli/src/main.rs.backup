@@ -1,0 +1,52 @@
+use devcontrol_core::modules::delivery;
+use devcontrol_core::discover;
+
+
+
+fn delivery_command(args:&Vec<String>) {
+
+    if args.len() < 3 {
+        devcontrol_core::modules::delivery::status();
+        return;
+    }
+
+    match args[2].as_str() {
+        "status" =>
+            devcontrol_core::modules::delivery::status(),
+
+        "test" =>
+            devcontrol_core::modules::delivery::test(),
+
+        "deploy" =>
+            devcontrol_core::modules::delivery::deploy(),
+
+        "rollback" =>
+            devcontrol_core::modules::delivery::rollback(),
+
+        _ =>
+            devcontrol_core::modules::delivery::status(),
+    }
+}
+
+
+fn main()
+{
+
+    let args:Vec<String>=std::env::args().collect();
+
+
+    if args.len()>1 && args[1]=="discover"{
+
+        discover(
+            "/mnt/disk1/Code"
+        );
+
+    }else{
+
+        println!(
+            "Usage: devctl discover"
+        );
+
+    }
+
+}
