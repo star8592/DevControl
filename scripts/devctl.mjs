@@ -21,6 +21,7 @@ function run(script, args = []) {
 
 const [command = 'status', ...args] = process.argv.slice(2);
 
+if (command === 'adopt') run('scripts/adopt-project.mjs', args);
 if (command === 'discover') run('scripts/discover-projects.mjs', args);
 if (command === 'sync') run('scripts/sync-projects.mjs', args);
 if (command === 'qualify') run('scripts/qualify-projects.mjs', args);
@@ -76,6 +77,6 @@ if (command === 'status') {
 
 console.error(`Unknown command: ${command}`);
 console.error(
-  'Commands: discover, sync, qualify, visual-probe, visual-enable, visual-disable, visual-reset, visual-status, visual-run, reconcile, failures, repairs, auto-fix, repair-publish, repair-review, repair-cleanup, local, quarantine-clear, status, check'
+  'Commands: adopt, discover, sync, qualify, visual-probe, visual-enable, visual-disable, visual-reset, visual-status, visual-run, reconcile, failures, repairs, auto-fix, repair-publish, repair-review, repair-cleanup, local, quarantine-clear, status, check'
 );
 process.exit(2);
