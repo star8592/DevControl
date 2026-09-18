@@ -62,3 +62,17 @@ if (command === 'status') {
 console.error(`Unknown command: ${command}`);
 console.error('Commands: discover, sync, qualify, git, visual-*, reconcile, failures, repairs, auto-fix, repair-*, local, quarantine-clear, status, check');
 process.exit(2);
+
+
+// Local Agent Doctor
+if(process.argv[2]==="doctor"){
+
+ const {doctor}=await import("../lib/local-agent/index.mjs");
+
+ const result=await doctor();
+
+ console.log(JSON.stringify(result,null,2));
+
+ process.exit(0);
+}
+
