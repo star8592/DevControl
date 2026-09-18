@@ -1,0 +1,130 @@
+use std::env;
+
+fn help(){
+
+println!(r#"
+DevControl CLI v0.2
+
+Commands:
+
+discover
+status
+regression <path>
+autonomous run <path>
+report
+agent start
+repair
+delivery
+
+"#);
+
+}
+
+
+fn regression(path:&str){
+
+println!("===== Regression =====");
+
+println!("Project:");
+println!("{}",path);
+
+
+if std::path::Path::new(path)
+.join("Cargo.toml")
+.exists()
+{
+    println!("Stack: Rust");
+    println!("Build: cargo build");
+    println!("Test: cargo test");
+}
+else
+{
+    println!("Stack: Unknown");
+}
+
+
+println!("Report:");
+println!("~/.devcontrol/runs/latest/report.json");
+
+}
+
+
+
+fn main(){
+
+let args:Vec<String>=env::args().collect();
+
+
+if args.len()<2{
+    help();
+    return;
+}
+
+
+match args[1].as_str(){
+
+
+"discover"=>{
+ println!("Scanning projects");
+}
+
+
+"status"=>{
+ println!("DevControl online");
+}
+
+
+"regression"=>{
+
+ if args.len()>2{
+    regression(&args[2]);
+ }
+ else{
+    println!("missing path");
+ }
+
+}
+
+
+"autonomous"=>{
+
+ println!("Autonomous runner ready");
+
+}
+
+
+"report"=>{
+
+ println!("No report");
+
+}
+
+
+"agent"=>{
+
+ println!("Agent ready");
+
+}
+
+
+"repair"=>{
+
+ println!("Repair ready");
+
+}
+
+
+"delivery"=>{
+
+ println!("Delivery");
+
+}
+
+
+_=>{
+ help();
+}
+
+}
+
+}

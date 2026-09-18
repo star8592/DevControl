@@ -1,0 +1,13 @@
+name="DaoLife"
+
+adapter="bevy"
+
+path="/mnt/disk1/Code/DaoLife"
+
+build="cargo check"
+
+run="cargo run"
+
+visual=true
+
+gpu=true

@@ -1,88 +1,90 @@
-use devcontrol_core::discover;
-use devcontrol_core::modules::delivery;
+use std::env;
 
 
-fn delivery_command(args:&Vec<String>) {
+fn help(){
 
-    if args.len() < 3 {
-        delivery::status();
-        return;
-    }
+println!(r#"
+DevControl CLI
 
+Commands:
 
-    match args[2].as_str() {
+discover
+status
+regression <path>
+autonomous <path>
+agent start
+report
+repair
 
-        "status" => {
-            delivery::status();
-        },
+"#);
 
-        "test" => {
-            delivery::test();
-        },
-
-        "deploy" => {
-            delivery::deploy();
-        },
-
-        "rollback" => {
-            delivery::rollback();
-        },
-
-        _ => {
-            delivery::status();
-        }
-    }
 }
-
 
 
 fn main(){
 
-    let args:Vec<String> =
-        std::env::args().collect();
+let args:Vec<String>=env::args().collect();
 
 
-    if args.len()>1 {
+match args.get(1)
+.map(|x|x.as_str())
+{
 
 
-        match args[1].as_str(){
+Some("discover")=>{
+ println!("discover");
+}
 
 
-            "discover" => {
-
-                discover(
-                    "/mnt/disk1/Code"
-                );
-
-            },
+Some("status")=>{
+ println!("DevControl online");
+}
 
 
-            "delivery" => {
+Some("regression")=>{
 
-                delivery_command(
-                    &args
-                );
+println!("Regression runner");
 
-            },
+if let Some(p)=args.get(2){
+ println!("Project: {}",p);
+}
 
-
-            _ => {
-
-                println!(
-                    "Commands: discover, delivery"
-                );
-
-            }
-
-        }
+}
 
 
-    }else{
+Some("autonomous")=>{
 
-        println!(
-            "Commands: discover, delivery"
-        );
+println!("Autonomous runner");
 
-    }
+}
+
+
+Some("agent")=>{
+
+println!("Agent");
+
+}
+
+
+Some("report")=>{
+
+println!("Report");
+
+}
+
+
+Some("repair")=>{
+
+println!("Repair");
+
+}
+
+
+_=>{
+ help();
+}
+
+
+}
 
 }
