@@ -76,3 +76,47 @@ if(process.argv[2]==="doctor"){
  process.exit(0);
 }
 
+
+
+if(process.argv[2]==="diagnose"){
+
+ const {diagnose}=await import("../lib/diagnostics/index.mjs");
+
+ const project=
+   process.argv[3] ||
+   process.cwd();
+
+
+ console.log(
+   JSON.stringify(
+     diagnose(project),
+     null,
+     2
+   )
+ );
+
+ process.exit(0);
+}
+
+
+
+if(process.argv[2]==="diagnose"){
+
+ const {diagnose}=await import("../lib/diagnostics/index.mjs");
+
+ const project=
+   process.argv[3] ||
+   process.cwd();
+
+
+ console.log(
+   JSON.stringify(
+     diagnose(project),
+     null,
+     2
+   )
+ );
+
+ process.exit(0);
+}
+
