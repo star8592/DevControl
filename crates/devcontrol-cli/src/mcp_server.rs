@@ -1,7 +1,9 @@
-use std::io::{self, BufRead};
 use std::fs;
+use std::io::{self, BufRead};
+
 use serde_json::json;
-use crate::mcp_protocol::{JsonRpcRequest, response};
+
+use crate::mcp_protocol::{response, JsonRpcRequest};
 
 fn tools_list() -> serde_json::Value {
     json!({
@@ -22,7 +24,8 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
         return json!({"error":"missing params"});
     };
 
-    let name = params.get("name")
+    let name = params
+        .get("name")
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
@@ -30,7 +33,8 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
 
     match name {
         "fs.list" => {
-            let path = arguments.get("path")
+            let path = arguments
+                .get("path")
                 .and_then(|v| v.as_str())
                 .unwrap_or(".");
 
@@ -42,41 +46,43 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
                         .collect();
                     json!({"content": files})
                 }
-                Err(e) => json!({"error": e.to_string()})
+                Err(e) => json!({"error": e.to_string()}),
             }
         }
         "fs.read" => {
-            let path = arguments.get("path")
+            let path = arguments
+                .get("path")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
 
             match fs::read_to_string(path) {
                 Ok(content) => json!({"content": content}),
-                Err(e) => json!({"error": e.to_string()})
+                Err(e) => json!({"error": e.to_string()}),
             }
         }
         "fs.write" => {
-            let path = arguments.get("path")
+            let path = arguments
+                .get("path")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let content = arguments.get("content")
+            let content = arguments
+                .get("content")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
 
             match fs::write(path, content) {
                 Ok(_) => json!({"status":"ok","path":path}),
-                Err(e) => json!({"error":e.to_string()})
+                Err(e) => json!({"error":e.to_string()}),
             }
         }
-        "process.start" | "process.list" |
-        "process.stop" | "process.logs" => {
+        "process.start" | "process.list" | "process.stop" | "process.logs" => {
             json!({
                 "status":"accepted",
                 "tool":name,
                 "message":"execution binding pending"
             })
         }
-        _ => json!({"error":"unknown tool"})
+        _ => json!({"error":"unknown tool"}),
     }
 }
 
@@ -89,12 +95,20 @@ pub fn run_stdio() {
             continue;
         };
 
+        if let Err(message) = req.validate() {
+            println!("{}", response(req.id, json!({"error": message})));
+            continue;
+        }
+
         let output = match req.method.as_str() {
-            "initialize" => response(req.id, json!({
-                "protocolVersion":"2025-06-18",
-                "capabilities":{"tools":{"listChanged":true}},
-                "serverInfo":{"name":"devcontrol","version":"0.3.0"}
-            })),
+            "initialize" => response(
+                req.id,
+                json!({
+                    "protocolVersion":"2025-06-18",
+                    "capabilities":{"tools":{"listChanged":true}},
+                    "serverInfo":{"name":"devcontrol","version":"0.3.0"}
+                }),
+            ),
             "tools/list" => response(req.id, tools_list()),
             "tools/call" => response(req.id, tool_call(req.params)),
             _ => response(req.id, json!({"error":"method not implemented"})),
