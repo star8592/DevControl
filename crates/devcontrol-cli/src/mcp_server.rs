@@ -26,11 +26,11 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
+    let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
+
     match name {
         "fs.list" => {
-            let path = params
-                .get("arguments")
-                .and_then(|v| v.get("path"))
+            let path = arguments.get("path")
                 .and_then(|v| v.as_str())
                 .unwrap_or(".");
 
@@ -45,7 +45,17 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
                 Err(e) => json!({"error": e.to_string()})
             }
         }
-        "fs.read" | "fs.write" |
+        "fs.read" => {
+            let path = arguments.get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            match fs::read_to_string(path) {
+                Ok(content) => json!({"content": content}),
+                Err(e) => json!({"error": e.to_string()})
+            }
+        }
+        "fs.write" |
         "process.start" | "process.list" |
         "process.stop" | "process.logs" => {
             json!({
