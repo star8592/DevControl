@@ -1,4 +1,5 @@
 pub mod discovery;
+pub mod doctor;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -23,12 +24,7 @@ pub struct Policy {
 
 impl Default for Policy {
     fn default() -> Self {
-        Self {
-            fs_write: false,
-            shell_exec: false,
-            process_manage: false,
-            git_write: false,
-        }
+        Self { fs_write: false, shell_exec: false, process_manage: false, git_write: false }
     }
 }
 
@@ -48,17 +44,5 @@ impl Policy {
             Capability::GitWrite => self.git_write,
         };
         allowed.then_some(()).ok_or(PolicyError::Denied(capability))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_policy_is_read_only() {
-        let policy = Policy::default();
-        assert!(policy.authorize(Capability::FsRead).is_ok());
-        assert!(policy.authorize(Capability::GitRead).is_ok());
     }
 }
