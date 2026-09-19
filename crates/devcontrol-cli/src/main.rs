@@ -1,3 +1,5 @@
+mod fs_command;
+
 use devcontrol_core::{discovery, doctor, report, Capability, Policy};
 
 fn main() {
@@ -7,6 +9,7 @@ fn main() {
         "doctor" => doctor_cmd(),
         "discover" => discover(),
         "report" => report_cmd(),
+        "fs" => fs_command::run(&std::env::args().skip(2).collect::<Vec<_>>()),
         "status" => status(),
         "help" | "--help" | "-h" => help(),
         _ => {
@@ -42,5 +45,5 @@ fn status() {
 }
 
 fn help() {
-    println!("usage: devctl <doctor [path]|discover [path]|report [path]|status>");
+    println!("usage: devctl <doctor|discover|report|fs|status>");
 }
