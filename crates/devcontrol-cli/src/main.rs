@@ -1,4 +1,5 @@
 mod fs_command;
+mod process_command;
 
 use devcontrol_core::{Capability, Policy};
 
@@ -12,11 +13,10 @@ fn main() {
             policy.authorize(Capability::FsRead).expect("read capability");
             println!("DevControl: OK");
         }
-        "fs" => {
-            fs_command::run(&args[1..]);
-        }
+        "fs" => fs_command::run(&args[1..]),
+        "process" => process_command::run(&args[1..]),
         _ => {
-            eprintln!("usage: devctl doctor | fs <list|read|write>");
+            eprintln!("usage: devctl doctor | fs <list|read|write> | process <start|logs|stop>");
             std::process::exit(2);
         }
     }
