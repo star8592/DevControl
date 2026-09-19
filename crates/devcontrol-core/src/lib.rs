@@ -1,3 +1,6 @@
+pub mod audit;
+pub mod fs;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -21,12 +24,7 @@ pub struct Policy {
 
 impl Default for Policy {
     fn default() -> Self {
-        Self {
-            fs_write: false,
-            shell_exec: false,
-            process_manage: false,
-            git_write: false,
-        }
+        Self { fs_write: false, shell_exec: false, process_manage: false, git_write: false }
     }
 }
 
