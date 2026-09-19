@@ -1,4 +1,4 @@
-use devcontrol_core::{Capability, Policy};
+use devcontrol_core::{discovery, Capability, Policy};
 
 fn main() {
     let command = std::env::args().nth(1).unwrap_or_else(|| "doctor".into());
@@ -25,7 +25,9 @@ fn doctor() {
 }
 
 fn discover() {
-    println!("DevControl discover: project discovery placeholder");
+    let path = std::env::args().nth(2).unwrap_or_else(|| ".".into());
+    let info = discovery::discover(path);
+    println!("{}", serde_json::to_string_pretty(&info).unwrap());
 }
 
 fn status() {
@@ -33,5 +35,5 @@ fn status() {
 }
 
 fn help() {
-    println!("usage: devctl <doctor|discover|status>");
+    println!("usage: devctl <doctor|discover [path]|status>");
 }
