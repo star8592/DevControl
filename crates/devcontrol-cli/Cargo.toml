@@ -6,3 +6,4 @@ license.workspace = true
 
 [dependencies]
 devcontrol-core = { path = "../devcontrol-core" }
+serde_json = "1"
