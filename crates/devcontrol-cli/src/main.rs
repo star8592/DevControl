@@ -5,7 +5,9 @@ fn main() {
     match command.as_str() {
         "doctor" => {
             let policy = Policy::default();
-            policy.authorize(Capability::FsRead).expect("read capability");
+            policy
+                .authorize(Capability::FsRead)
+                .expect("read capability");
             println!("DevControl: OK");
         }
         _ => {
