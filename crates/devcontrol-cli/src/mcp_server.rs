@@ -137,7 +137,8 @@ mod tests {
 
     #[test]
     fn tools_list_exposes_process_run() {
-        let names: Vec<&str> = tools_list()["tools"]
+        let value = tools_list();
+        let names: Vec<&str> = value["tools"]
             .as_array()
             .expect("tools array")
             .iter()
