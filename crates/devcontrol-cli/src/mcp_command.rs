@@ -1,7 +1,12 @@
+mod mcp_server;
+
 use serde_json::json;
 
 pub fn run(args: &[String]) {
     match args.first().map(String::as_str) {
+        Some("server") => {
+            mcp_server::run_stdio();
+        }
         Some("tools") => {
             println!("{}", json!({
                 "tools": [
@@ -19,7 +24,7 @@ pub fn run(args: &[String]) {
             println!("{}", json!({"status":"ready"}));
         }
         _ => {
-            eprintln!("usage: devctl mcp <tools|status>");
+            eprintln!("usage: devctl mcp <server|tools|status>");
         }
     }
 }
