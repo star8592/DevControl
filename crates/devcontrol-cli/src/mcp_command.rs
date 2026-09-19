@@ -1,5 +1,4 @@
-mod mcp_server;
-
+use crate::mcp_server;
 use serde_json::json;
 
 pub fn run(args: &[String]) {
