@@ -27,8 +27,8 @@ fn doctor_cmd() {
 
 fn discover() {
     let path = std::env::args().nth(2).unwrap_or_else(|| ".".into());
-    let info = discovery::discover(path);
-    println!("{}", serde_json::to_string_pretty(&info).unwrap());
+    let result = discovery::discover(path);
+    println!("{}", serde_json::to_string_pretty(&result).unwrap());
 }
 
 fn report_cmd() {
