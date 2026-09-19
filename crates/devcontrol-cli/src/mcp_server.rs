@@ -1,4 +1,5 @@
 use std::io::{self, BufRead};
+use std::fs;
 use serde_json::json;
 use crate::mcp_protocol::{JsonRpcRequest, response};
 
@@ -26,13 +27,31 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
         .unwrap_or("");
 
     match name {
-        "fs.list" | "fs.read" | "fs.write" |
+        "fs.list" => {
+            let path = params
+                .get("arguments")
+                .and_then(|v| v.get("path"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(".");
+
+            match fs::read_dir(path) {
+                Ok(entries) => {
+                    let files: Vec<String> = entries
+                        .filter_map(|e| e.ok())
+                        .filter_map(|e| e.file_name().into_string().ok())
+                        .collect();
+                    json!({"content": files})
+                }
+                Err(e) => json!({"error": e.to_string()})
+            }
+        }
+        "fs.read" | "fs.write" |
         "process.start" | "process.list" |
         "process.stop" | "process.logs" => {
             json!({
                 "status":"accepted",
                 "tool":name,
-                "message":"router connected; execution binding next"
+                "message":"execution binding pending"
             })
         }
         _ => json!({"error":"unknown tool"})
