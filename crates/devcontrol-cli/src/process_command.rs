@@ -37,14 +37,25 @@ pub fn run(args: &[String]) {
         }
         Some("stop") => {
             let id = args.get(1).and_then(|v| v.parse::<u64>().ok());
-            match id.and_then(|x| store.processes.iter_mut().find(|p| p.id == x)) {
-                Some(item) => {
-                    let _ = Command::new("kill").arg(item.pid.to_string()).status();
-                    item.status = "stopped".to_string();
-                    store.save(path).expect("save process store");
-                    println!("process stopped id={}", item.id);
+            match id {
+                Some(id) => {
+                    let pid = store.processes.iter()
+                        .find(|p| p.id == id)
+                        .map(|p| p.pid);
+
+                    match pid {
+                        Some(pid) => {
+                            let _ = Command::new("kill").arg(pid.to_string()).status();
+                            if let Some(item) = store.processes.iter_mut().find(|p| p.id == id) {
+                                item.status = "stopped".to_string();
+                            }
+                            store.save(path).expect("save process store");
+                            println!("process stopped id={}", id);
+                        }
+                        None => eprintln!("process not found"),
+                    }
                 }
-                None => eprintln!("process not found"),
+                None => eprintln!("process id required"),
             }
         }
         Some("logs") => {
