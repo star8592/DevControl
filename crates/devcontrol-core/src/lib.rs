@@ -1,5 +1,6 @@
 pub mod process;
 pub mod process_session;
+pub mod process_registry;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
