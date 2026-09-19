@@ -1,5 +1,6 @@
 mod fs_command;
 mod mcp_command;
+mod mcp_protocol;
 mod mcp_server;
 mod process_command;
 
