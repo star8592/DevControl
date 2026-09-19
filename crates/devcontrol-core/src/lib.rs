@@ -1,5 +1,6 @@
 pub mod discovery;
 pub mod doctor;
+pub mod report;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
