@@ -55,7 +55,19 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
                 Err(e) => json!({"error": e.to_string()})
             }
         }
-        "fs.write" |
+        "fs.write" => {
+            let path = arguments.get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let content = arguments.get("content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            match fs::write(path, content) {
+                Ok(_) => json!({"status":"ok","path":path}),
+                Err(e) => json!({"error":e.to_string()})
+            }
+        }
         "process.start" | "process.list" |
         "process.stop" | "process.logs" => {
             json!({
