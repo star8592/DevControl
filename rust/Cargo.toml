@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["devcontrol-core", "devcontrol-cli"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+version = "0.1.0"
