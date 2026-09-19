@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, BufRead};
 
+use devcontrol_core::process_supervisor;
 use serde_json::json;
 
 use crate::mcp_protocol::{response, JsonRpcRequest};
@@ -14,7 +15,8 @@ fn tools_list() -> serde_json::Value {
             {"name":"process.start","description":"Start process"},
             {"name":"process.list","description":"List processes"},
             {"name":"process.stop","description":"Stop process"},
-            {"name":"process.logs","description":"Read process logs"}
+            {"name":"process.logs","description":"Read process logs"},
+            {"name":"process.run","description":"Run command and capture logs"}
         ]
     })
 }
@@ -75,6 +77,17 @@ fn tool_call(params: Option<serde_json::Value>) -> serde_json::Value {
                 Err(e) => json!({"error":e.to_string()}),
             }
         }
+        "process.run" => {
+            let command = arguments
+                .get("command")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            match process_supervisor::run(command) {
+                Ok(result) => json!(result),
+                Err(e) => json!({"error": e.to_string()}),
+            }
+        }
         "process.start" | "process.list" | "process.stop" | "process.logs" => {
             json!({
                 "status":"accepted",
@@ -115,5 +128,22 @@ pub fn run_stdio() {
         };
 
         println!("{}", output);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tools_list_exposes_process_run() {
+        let names: Vec<&str> = tools_list()["tools"]
+            .as_array()
+            .expect("tools array")
+            .iter()
+            .filter_map(|tool| tool["name"].as_str())
+            .collect();
+
+        assert!(names.contains(&"process.run"));
     }
 }
