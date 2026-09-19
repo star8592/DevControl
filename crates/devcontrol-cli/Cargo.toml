@@ -1,0 +1,8 @@
+[package]
+name = "devctl"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+devcontrol-core = { path = "../devcontrol-core" }

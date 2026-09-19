@@ -1,7 +1,4 @@
+/target
+/state
 .env
-.env.local
-node_modules/
-state/
-public/autonomy-data.json
 *.log
-.DS_Store
