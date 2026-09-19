@@ -1,6 +1,9 @@
 pub mod discovery;
 pub mod doctor;
 pub mod report;
+pub mod process;
+pub mod process_registry;
+pub mod process_session;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
