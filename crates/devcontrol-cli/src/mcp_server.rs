@@ -147,4 +147,15 @@ mod tests {
 
         assert!(names.contains(&"process.run"));
     }
+
+    #[test]
+    fn process_run_is_routed() {
+        let result = tool_call(Some(json!({
+            "name": "process.run",
+            "arguments": {"command": ""}
+        })));
+
+        assert_ne!(result["error"], "unknown tool");
+        assert_eq!(result["error"], "command must not be empty");
+    }
 }
