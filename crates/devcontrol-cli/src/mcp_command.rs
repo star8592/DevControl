@@ -15,7 +15,8 @@ pub fn run(args: &[String]) {
                     "process.start",
                     "process.list",
                     "process.stop",
-                    "process.logs"
+                    "process.logs",
+                    "process.run"
                 ]
             }));
         }
