@@ -1,5 +1,6 @@
 mod fs_command;
 mod mcp_command;
+mod mcp_server;
 mod process_command;
 
 use devcontrol_core::{Capability, Policy};
@@ -18,7 +19,7 @@ fn main() {
         "process" => process_command::run(&args[1..]),
         "mcp" => mcp_command::run(&args[1..]),
         _ => {
-            eprintln!("usage: devctl doctor | fs <list|read|write> | process <start|logs|stop> | mcp <tools|status>");
+            eprintln!("usage: devctl doctor | fs <list|read|write> | process <start|logs|stop> | mcp <server|tools|status>");
             std::process::exit(2);
         }
     }
