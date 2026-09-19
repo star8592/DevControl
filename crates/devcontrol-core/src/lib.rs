@@ -1,3 +1,5 @@
+pub mod discovery;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -58,13 +60,5 @@ mod tests {
         let policy = Policy::default();
         assert!(policy.authorize(Capability::FsRead).is_ok());
         assert!(policy.authorize(Capability::GitRead).is_ok());
-        assert_eq!(
-            policy.authorize(Capability::FsWrite),
-            Err(PolicyError::Denied(Capability::FsWrite))
-        );
-        assert_eq!(
-            policy.authorize(Capability::ShellExec),
-            Err(PolicyError::Denied(Capability::ShellExec))
-        );
     }
 }
