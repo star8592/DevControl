@@ -8,6 +8,15 @@ pub struct JsonRpcRequest {
     pub params: Option<serde_json::Value>,
 }
 
+impl JsonRpcRequest {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.jsonrpc != "2.0" {
+            return Err("unsupported jsonrpc version");
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct JsonRpcResponse<T: Serialize> {
     pub jsonrpc: &'static str,
@@ -20,5 +29,6 @@ pub fn response<T: Serialize>(id: Option<u64>, result: T) -> String {
         jsonrpc: "2.0",
         id,
         result,
-    }).unwrap()
+    })
+    .unwrap()
 }
